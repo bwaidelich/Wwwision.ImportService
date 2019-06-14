@@ -1,0 +1,23 @@
+{
+  "name": "wwwision/import-service",
+  "type": "neos-package",
+  "description": "Generic service for importing data from different sources to configurable targets such as the Neos Content Repository or an arbitrary database table",
+  "license": "MIT",
+  "require": {
+    "ext-json": "*",
+    "neos/flow": "^5.2"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-master"
+  },
+  "autoload": {
+    "psr-4": {
+      "Wwwision\\ImportService\\": "Classes/"
+    }
+  },
+  "extra": {
+    "neos": {
+      "package-key": "Wwwision.ImportService"
+    }
+  }
+}
