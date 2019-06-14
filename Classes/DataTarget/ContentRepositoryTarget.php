@@ -7,7 +7,7 @@ use Wwwision\ImportService\Mapper;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
-use Wwwision\ImportService\ValueObject\DataRecord;
+use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\NonUniqueResultException;
@@ -22,6 +22,7 @@ use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Core\Cache\ContentCache;
 use Neos\Utility\Arrays;
 use Neos\Utility\ObjectAccess;
+use Wwwision\ImportService\ValueObject\DataVersion;
 
 /**
  * Neos Content Repository data target
@@ -168,14 +169,14 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $removedIds = $activeNodeDataIds->diff($records->getIds());
         $localDataLastModificationDates = array_column($nodeDataRecords, 'lastPublicationDateTime', 'identifier');
 
-        $isUpdatedClosure = static function(DataRecord $record) use ($localDataLastModificationDates) {
-            if (!$record->hasAttribute('_timestamp')) {
+        $isUpdatedClosure = static function(DataRecordInterface $record) use ($localDataLastModificationDates) {
+            if (!$record->hasVersion()) {
                 return true;
             }
             if (!\array_key_exists($record->id()->toString(), $localDataLastModificationDates)) {
                 return true;
             }
-            return $record->attribute('_timestamp') > $localDataLastModificationDates[$record->id()->toString()];
+            return $record->version()->isHigherThan(DataVersion::fromDateTime($localDataLastModificationDates[$record->id()->toString()]));
         };
 
         $updatedRecords = DataRecords::createEmpty();
@@ -218,7 +219,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         return $nodeTypeNames;
     }
 
-    public function addRecord(DataRecord $record): void
+    public function addRecord(DataRecordInterface $record): void
     {
         $nodePath = $this->eelRenderer->evaluateIfExpression($this->nodePath, ['record' => $record]);
         $parentNodeData = $this->getNodeDataByPath((string)$nodePath);
@@ -236,7 +237,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
     }
 
-    public function updateRecord(DataRecord $record): void
+    public function updateRecord(DataRecordInterface $record): void
     {
         $nodeData = $this->getNodeDataByDataId($record->id());
         $this->mapNodeData($nodeData, $record);
@@ -313,7 +314,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $this->cacheTagsToFlush = [];
     }
 
-    private function mapNodeData(NodeData $nodeData, DataRecord $record): void
+    private function mapNodeData(NodeData $nodeData, DataRecordInterface $record): void
     {
         $mappedValues = array_filter($this->mapper->mapRecord($record), static function($value) {
             return $value !== null;

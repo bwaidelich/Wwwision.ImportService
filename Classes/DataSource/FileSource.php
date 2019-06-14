@@ -17,6 +17,11 @@ final class FileSource implements DataSourceInterface
      */
     private $idAttributeName;
 
+    /**
+     * @var string|null
+     */
+    private $versionAttributeName;
+
     protected function __construct(array $options)
     {
         if (!isset($options['filePath'])) {
@@ -24,6 +29,7 @@ final class FileSource implements DataSourceInterface
         }
         $this->filePath = $options['filePath'];
         $this->idAttributeName = $options['idAttributeName'] ?? 'id';
+        $this->versionAttributeName = $options['versionAttributeName'] ?? null;
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
@@ -34,6 +40,6 @@ final class FileSource implements DataSourceInterface
     public function load(): DataRecords
     {
         $fileContents = file_get_contents($this->filePath);
-        return DataRecords::fromRawArray(json_decode($fileContents, true), $this->idAttributeName);
+        return DataRecords::fromRawArray(json_decode($fileContents, true), $this->idAttributeName, $this->versionAttributeName);
     }
 }

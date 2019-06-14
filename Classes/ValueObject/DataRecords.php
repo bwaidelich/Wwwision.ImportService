@@ -10,7 +10,7 @@ use Neos\Flow\Annotations as Flow;
 final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializable
 {
     /**
-     * @var DataRecord[]
+     * @var DataRecordInterface[]
      */
     private $records;
 
@@ -29,7 +29,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
         return new self([]);
     }
 
-    public static function fromRawArray(array $array, string $idAttributeName): self
+    public static function fromRawArray(array $array, string $idAttributeName, ?string $versionAttributeName): self
     {
         $records = [];
         foreach ($array as $item) {
@@ -37,7 +37,14 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
                 throw new \RuntimeException(sprintf('the id attribute "%s" is not part of the data source', $idAttributeName), 1558001632);
             }
             $id = (string)$item[$idAttributeName];
-            $records[$id] = DataRecord::fromIdAndAttributes(DataId::fromString($id), $item);
+            if ($versionAttributeName !== null) {
+                if (!isset($item[$versionAttributeName])) {
+                    throw new \RuntimeException(sprintf('the version attribute "%s" is not part of the data source', $versionAttributeName), 1560523547);
+                }
+                $records[$id] = DataRecord::fromIdVersionAndAttributes(DataId::fromString($id), DataVersion::parse($item[$versionAttributeName]), $item);
+            } else {
+                $records[$id] = DataRecord::fromIdAndAttributes(DataId::fromString($id), $item);
+            }
         }
         return new self($records);
     }
@@ -46,7 +53,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
     {
         $processedRecords = [];
         foreach ($records as $record) {
-            if (!$record instanceof DataRecord) {
+            if (!$record instanceof DataRecordInterface) {
                 throw new \RuntimeException(sprintf('Excepted array of %s instances, got: %s', DataRecord::class, \is_object($record) ? \get_class($record) : \gettype($record)), 1558352216);
             }
             $processedRecords[$record->id()->toString()] = $record;
@@ -54,7 +61,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
         return new self($processedRecords);
     }
 
-    public function withRecord(DataRecord $record): self
+    public function withRecord(DataRecordInterface $record): self
     {
         if ($this->hasRecord($record)) {
             return $this;
@@ -64,7 +71,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
         return new self($newRecords);
     }
 
-    public function hasRecord(DataRecord $record): bool
+    public function hasRecord(DataRecordInterface $record): bool
     {
         return $this->hasRecordWithId($record->id());
     }
@@ -75,7 +82,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
     }
 
     /**
-     * @return DataRecord[]|\Iterator
+     * @return DataRecordInterface[]|\Iterator
      */
     public function getIterator(): \Iterator
     {

@@ -6,7 +6,7 @@ use Wwwision\ImportService\DataSource\DataSourceInterface;
 use Wwwision\ImportService\DataTarget\DataTargetInterface;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
-use Wwwision\ImportService\ValueObject\DataRecord;
+use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
 /**
@@ -110,12 +110,12 @@ final class Preset
         return $this->dataTarget->computeDataChanges($records, $forceUpdates);
     }
 
-    public function addRecord(DataRecord $record): void
+    public function addRecord(DataRecordInterface $record): void
     {
         $this->dataTarget->addRecord($record);
     }
 
-    public function updateRecord(DataRecord $record): void
+    public function updateRecord(DataRecordInterface $record): void
     {
         $this->dataTarget->updateRecord($record);
     }

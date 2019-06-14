@@ -6,7 +6,7 @@ use Wwwision\ImportService\Mapper;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
-use Wwwision\ImportService\ValueObject\DataRecord;
+use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DBALException;
@@ -14,6 +14,7 @@ use Doctrine\DBAL\Driver\Statement;
 use Doctrine\DBAL\DriverManager;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\Arrays;
+use Wwwision\ImportService\ValueObject\DataVersion;
 
 /**
  * DBAL data target
@@ -117,19 +118,27 @@ final class DbalTarget implements DataTargetInterface
         return DataIds::fromStringArray(array_column($this->localRows(), $this->idColumn));
     }
 
-    private function localVersion(DataId $dataId)
+    private function localVersion(DataId $dataId): ?DataVersion
     {
         if ($this->localVersionsCache === null) {
             $this->localVersionsCache = array_column($this->localRows(), $this->versionColumn, $this->idColumn);
         }
-        return $this->localVersionsCache[$dataId->toString()] ?? null;
+        if (!isset($this->localVersionsCache[$dataId->toString()])) {
+            return null;
+        }
+        return DataVersion::parse($this->localVersionsCache[$dataId->toString()]);
     }
 
-    public function isRecordUpdated(DataRecord $record): bool
+    public function isRecordUpdated(DataRecordInterface $record): bool
     {
-        $remoteVersion = $this->mapper->attributeValueForColumn($record, $this->versionColumn);
+        if (!$record->hasVersion()) {
+            return true;
+        }
         $localVersion = $this->localVersion($record->id());
-        return ($remoteVersion > $localVersion);
+        if ($localVersion === null) {
+            return true;
+        }
+        return $record->version()->isHigherThan($localVersion);
     }
 
     private function localRows(): array
@@ -141,19 +150,19 @@ final class DbalTarget implements DataTargetInterface
     }
 
     /**
-     * @param DataRecord $record
+     * @param DataRecordInterface $record
      * @throws DBALException
      */
-    public function addRecord(DataRecord $record): void
+    public function addRecord(DataRecordInterface $record): void
     {
         $this->dbal->insert($this->tableName, $this->mapper->mapRecord($record));
     }
 
     /**
-     * @param DataRecord $record
+     * @param DataRecordInterface $record
      * @throws DBALException
      */
-    public function updateRecord(DataRecord $record): void
+    public function updateRecord(DataRecordInterface $record): void
     {
         $this->dbal->update($this->tableName, $this->mapper->mapRecord($record), [$this->idColumn => $record->id()->toString()]);
     }

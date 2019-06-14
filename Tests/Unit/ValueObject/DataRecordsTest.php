@@ -2,7 +2,6 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\Tests\Unit\ValueObject;
 
-use Wwwision\ImportService\ValueObject\DataRecord;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Neos\Flow\Tests\UnitTestCase;
 use PHPUnit\Framework\Assert;
@@ -36,7 +35,7 @@ class DataRecordsTest extends UnitTestCase
      */
     public function countTests(array $rows, int $expectedCount): void
     {
-        $records = DataRecords::fromRawArray($rows, 'id');
+        $records = DataRecords::fromRawArray($rows, 'id', null);
         Assert::assertCount($expectedCount, $records);
     }
 }

@@ -1,12 +1,15 @@
 <?php
 namespace Wwwision\ImportService\DataSource;
 
+use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\DriverManager;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\Arrays;
+use Wwwision\ImportService\ValueObject\DataVersion;
+use Wwwision\ImportService\ValueObject\LazyLoadingDataRecord;
 
 final class DbalSource implements DataSourceInterface
 {
@@ -37,6 +40,16 @@ final class DbalSource implements DataSourceInterface
      */
     private $idColumn;
 
+    /**
+     * @var string|null
+     */
+    private $versionColumn;
+
+    /**
+     * @var bool
+     */
+    private $lazyloading;
+
     protected function __construct(array $options)
     {
         if (!isset($options['table'])) {
@@ -44,7 +57,9 @@ final class DbalSource implements DataSourceInterface
         }
         $this->tableName = $options['table'];
         $this->idColumn = $options['idColumn'] ?? 'id';
+        $this->versionColumn = $options['versionColumn'] ?? null;
         $this->customBackendOptions = $options['backendOptions'] ?? [];
+        $this->lazyloading = $options['lazyloading'] ?? false;
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
@@ -63,6 +78,32 @@ final class DbalSource implements DataSourceInterface
 
     public function load(): DataRecords
     {
-        return DataRecords::fromRawArray($this->dbal->fetchAll('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName)), $this->idColumn);
+        if ($this->lazyloading) {
+            return $this->loadLazily();
+        }
+
+        $rows = $this->dbal->fetchAll('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName));
+        return DataRecords::fromRawArray($rows, $this->idColumn, $this->versionColumn);
+    }
+
+    private function loadLazily(): DataRecords
+    {
+        $columnNames = [$this->dbal->quoteIdentifier($this->idColumn)];
+        if ($this->versionColumn !== null) {
+            $columnNames[] = $this->dbal->quoteIdentifier($this->versionColumn);
+        }
+        $rows = $this->dbal->fetchAll('SELECT ' . implode(', ', $columnNames) . ' FROM ' . $this->dbal->quoteIdentifier($this->tableName));
+        return DataRecords::fromRecords(array_map(function(array $row) {
+            $id = DataId::fromString($row[$this->idColumn]);
+            $closure = function() use ($id) {
+                return $this->dbal->fetchAssoc('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName) . ' WHERE ' . $this->dbal->quoteIdentifier($this->idColumn) . ' = :id', ['id' => $id->toString()]);
+            };
+            if ($this->versionColumn !== null) {
+                $version = DataVersion::parse($row[$this->versionColumn]);
+                return LazyLoadingDataRecord::fromIdClosureAndVersion($id, $closure, $version);
+            }
+            return LazyLoadingDataRecord::fromIdAndClosure($id, $closure);
+
+        }, $rows));
     }
 }

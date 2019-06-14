@@ -7,7 +7,7 @@ use Neos\Flow\Annotations as Flow;
 /**
  * @Flow\Proxy(false)
  */
-final class DataRecord implements DataRecordInterface
+final class LazyLoadingDataRecord implements DataRecordInterface
 {
     /**
      * @var DataId
@@ -20,37 +20,44 @@ final class DataRecord implements DataRecordInterface
     private $version;
 
     /**
+     * @var \Closure|null
+     */
+    private $lazyLoadingCallback;
+
+    /**
+     * @var bool
+     */
+    private $isLoaded = false;
+
+    /**
      * @var array
      */
     private $attributes;
 
-    private function __construct(DataId $id, array $attributes, ?DataVersion $version)
+    private function __construct(DataId $id, \Closure $lazyLoadingCallback, ?DataVersion $version)
     {
         $this->id = $id;
-        $this->attributes = $attributes;
+        $this->lazyLoadingCallback = $lazyLoadingCallback;
         $this->version = $version;
     }
 
-    public static function fromIdAndAttributes(DataId $id, array $attributes): self
+    public static function fromIdAndClosure(DataId $id, \Closure $lazyLoadingCallback): self
     {
-        return new self($id, $attributes, null);
+        return new self($id, $lazyLoadingCallback, null);
     }
 
-    public static function fromIdVersionAndAttributes(DataId $id, DataVersion $version, array $attributes): self
+    public static function fromIdClosureAndVersion(DataId $id, \Closure $lazyLoadingCallback, DataVersion $version): self
     {
-        return new self($id, $attributes, $version);
+        return new self($id, $lazyLoadingCallback, $version);
     }
 
-    public function withId(DataId $newId): self
+    private function load(): void
     {
-        return new self($newId, $this->attributes, $this->version);
-    }
-
-    public function withAttribute(string $attributeName, $attributeValue): self
-    {
-        $attributes = $this->attributes;
-        $attributes[$attributeName] = $attributeValue;
-        return new self($this->id, $attributes, $this->version);
+        if ($this->isLoaded) {
+            return;
+        }
+        $this->attributes = \call_user_func($this->lazyLoadingCallback, $this);
+        $this->isLoaded = true;
     }
 
     public function id(): DataId
@@ -70,11 +77,13 @@ final class DataRecord implements DataRecordInterface
 
     public function attributes(): array
     {
+        $this->load();
         return $this->attributes;
     }
 
     public function hasAttribute(string $attributeName): bool
     {
+        $this->load();
         return \array_key_exists($attributeName, $this->attributes);
     }
 

@@ -2,8 +2,8 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService;
 
-use Wwwision\ImportService\ValueObject\DataRecord;
 use Neos\Flow\Annotations as Flow;
+use Wwwision\ImportService\ValueObject\DataRecordInterface;
 
 /**
  * Data mapper that can be used from data targets
@@ -36,7 +36,7 @@ final class Mapper
         return new static($mapping);
     }
 
-    public function mapRecord(DataRecord $record): array
+    public function mapRecord(DataRecordInterface $record): array
     {
         $result = [];
         foreach ($this->mapping as $targetColumnName => $configuration) {
@@ -45,7 +45,7 @@ final class Mapper
         return $result;
     }
 
-    public function attributeValueForColumn(DataRecord $record, string $columnName)
+    public function attributeValueForColumn(DataRecordInterface $record, string $columnName)
     {
         if (!isset($this->mapping[$columnName])) {
             throw new \RuntimeException(sprintf('Missing mapping configuration for column "%s"', $columnName), 1558010499);

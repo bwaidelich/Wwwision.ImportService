@@ -29,6 +29,11 @@ final class HttpDataSource implements DataSourceInterface
      */
     private $idAttributeName;
 
+    /**
+     * @var string|null
+     */
+    private $versionAttributeName;
+
     protected function __construct(array $options)
     {
         if (empty($options['endpoint'])) {
@@ -36,6 +41,7 @@ final class HttpDataSource implements DataSourceInterface
         }
         $this->endpoint = new Uri($options['endpoint']);
         $this->idAttributeName = $options['idAttributeName'] ?? 'id';
+        $this->versionAttributeName = $options['versionAttributeName'] ?? null;
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
@@ -68,6 +74,6 @@ final class HttpDataSource implements DataSourceInterface
         if (\count($data) === 0) {
             throw new ImportServiceException(sprintf('The Http endpoint %s returned an empty result', $this->endpoint), 15203231381);
         }
-        return DataRecords::fromRawArray($data, $this->idAttributeName);
+        return DataRecords::fromRawArray($data, $this->idAttributeName, $this->versionAttributeName);
     }
 }
