@@ -45,7 +45,7 @@ final class EelEvaluator
     public function evaluate(string $expression, array $variables)
     {
         if ($this->eelDefaultContextVariables === null) {
-            $this->eelDefaultContextVariables = EelUtility::getDefaultContextVariables($this->eelDefaultContextConfiguration);
+            $this->eelDefaultContextVariables = $this->eelDefaultContextConfiguration === null ? [] : EelUtility::getDefaultContextVariables($this->eelDefaultContextConfiguration);
         }
         try {
             return EelUtility::evaluateEelExpression($expression, $this->eelEvaluator, array_merge($this->eelDefaultContextVariables, $variables));
