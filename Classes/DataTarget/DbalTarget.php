@@ -118,24 +118,24 @@ final class DbalTarget implements DataTargetInterface
         return DataIds::fromStringArray(array_column($this->localRows(), $this->idColumn));
     }
 
-    private function localVersion(DataId $dataId): ?DataVersion
+    private function localVersion(DataId $dataId): DataVersion
     {
         if ($this->localVersionsCache === null) {
             $this->localVersionsCache = array_column($this->localRows(), $this->versionColumn, $this->idColumn);
         }
         if (!isset($this->localVersionsCache[$dataId->toString()])) {
-            return null;
+            return DataVersion::none();
         }
         return DataVersion::parse($this->localVersionsCache[$dataId->toString()]);
     }
 
     public function isRecordUpdated(DataRecordInterface $record): bool
     {
-        if (!$record->hasVersion()) {
+        if ($record->version()->isNotSet()) {
             return true;
         }
         $localVersion = $this->localVersion($record->id());
-        if ($localVersion === null) {
+        if ($localVersion->isNotSet()) {
             return true;
         }
         return $record->version()->isHigherThan($localVersion);

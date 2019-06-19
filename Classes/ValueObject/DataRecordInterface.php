@@ -6,9 +6,7 @@ interface DataRecordInterface extends \ArrayAccess, \JsonSerializable
 {
     public function id(): DataId;
 
-    public function version(): ?DataVersion;
-
-    public function hasVersion(): bool;
+    public function version(): DataVersion;
 
     public function attributes(): array;
 

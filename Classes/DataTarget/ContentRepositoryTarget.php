@@ -170,13 +170,14 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $localDataLastModificationDates = array_column($nodeDataRecords, 'lastPublicationDateTime', 'identifier');
 
         $isUpdatedClosure = static function(DataRecordInterface $record) use ($localDataLastModificationDates) {
-            if (!$record->hasVersion()) {
+            if ($record->version()->isNotSet()) {
                 return true;
             }
             if (!\array_key_exists($record->id()->toString(), $localDataLastModificationDates)) {
                 return true;
             }
-            return $record->version()->isHigherThan(DataVersion::fromDateTime($localDataLastModificationDates[$record->id()->toString()]));
+            $localVersion = DataVersion::fromDateTime($localDataLastModificationDates[$record->id()->toString()]);
+            return $record->version()->isHigherThan($localVersion);
         };
 
         $updatedRecords = DataRecords::createEmpty();

@@ -34,7 +34,7 @@ final class LazyLoadingDataRecord implements DataRecordInterface
      */
     private $attributes;
 
-    private function __construct(DataId $id, \Closure $lazyLoadingCallback, ?DataVersion $version)
+    private function __construct(DataId $id, \Closure $lazyLoadingCallback, DataVersion $version)
     {
         $this->id = $id;
         $this->lazyLoadingCallback = $lazyLoadingCallback;
@@ -43,7 +43,7 @@ final class LazyLoadingDataRecord implements DataRecordInterface
 
     public static function fromIdAndClosure(DataId $id, \Closure $lazyLoadingCallback): self
     {
-        return new self($id, $lazyLoadingCallback, null);
+        return new self($id, $lazyLoadingCallback, DataVersion::none());
     }
 
     public static function fromIdClosureAndVersion(DataId $id, \Closure $lazyLoadingCallback, DataVersion $version): self
@@ -65,12 +65,7 @@ final class LazyLoadingDataRecord implements DataRecordInterface
         return $this->id;
     }
 
-    public function hasVersion(): bool
-    {
-        return $this->version !== null;
-    }
-
-    public function version(): ?DataVersion
+    public function version(): DataVersion
     {
         return $this->version;
     }

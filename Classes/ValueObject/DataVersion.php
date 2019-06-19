@@ -10,13 +10,28 @@ use Neos\Flow\Annotations as Flow;
 final class DataVersion
 {
     /**
+     * @const int
+     */
+    private const NONE = -1;
+
+    /**
      * @var int
      */
     private $value;
 
     private function __construct(int $value)
     {
+        if ($value < 0) {
+            throw new \InvalidArgumentException(sprintf('version must not be less than 0, given: %d', $value), 1560596325);
+        }
         $this->value = $value;
+    }
+
+    public static function none(): self
+    {
+        $instance = new self(0);
+        $instance->value = self::NONE;
+        return $instance;
     }
 
     public static function fromNumber(int $value): self
@@ -71,6 +86,11 @@ final class DataVersion
     public function isHigherThan(DataVersion $otherVersion): bool
     {
         return $this->value > $otherVersion->value;
+    }
+
+    public function isNotSet(): bool
+    {
+        return $this->value === self::NONE;
     }
 
     public function __toString(): string

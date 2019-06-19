@@ -15,7 +15,7 @@ final class DataRecord implements DataRecordInterface
     private $id;
 
     /**
-     * @var DataVersion|null
+     * @var DataVersion
      */
     private $version;
 
@@ -24,7 +24,7 @@ final class DataRecord implements DataRecordInterface
      */
     private $attributes;
 
-    private function __construct(DataId $id, array $attributes, ?DataVersion $version)
+    private function __construct(DataId $id, array $attributes, DataVersion $version)
     {
         $this->id = $id;
         $this->attributes = $attributes;
@@ -33,7 +33,7 @@ final class DataRecord implements DataRecordInterface
 
     public static function fromIdAndAttributes(DataId $id, array $attributes): self
     {
-        return new self($id, $attributes, null);
+        return new self($id, $attributes, DataVersion::none());
     }
 
     public static function fromIdVersionAndAttributes(DataId $id, DataVersion $version, array $attributes): self
@@ -58,12 +58,7 @@ final class DataRecord implements DataRecordInterface
         return $this->id;
     }
 
-    public function hasVersion(): bool
-    {
-        return $this->version !== null;
-    }
-
-    public function version(): ?DataVersion
+    public function version(): DataVersion
     {
         return $this->version;
     }
