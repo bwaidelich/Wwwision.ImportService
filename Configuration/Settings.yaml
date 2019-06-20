@@ -1,25 +1,28 @@
-Wwwision:
-  ImportService:
-    presets:
-      'test':
-        syncOnly: false
-        source:
-          className: 'Wwwision\ImportService\DataSource\DbalSource'
-          options:
-            backendOptions:
-              dbname: test
-            table: 'source'
-          fixture:
-            file: 'resource://some/file'
-          postProcessor: 'Wwwision\Webkatalog\Service\ImportService\PapiProcessors::processEducationalAreas'
-        target:
-          className: 'Wwwision\ImportService\DataTarget\DbalTarget'
-          options:
-            table: 'target'
-            idColumn: 'slug'
-            versionColumn: 'version'
-        mapping:
-          'slug': 'id'
-          'givenname': '${record.foo}'
-          'familyname': 'lastname'
-          'version': 'revision'
+---
+# Example Configuration:
+#
+#Wwwision:
+#  ImportService:
+#    presets:
+#      'some:preset':
+#        syncOnly: false
+#        source:
+#          className: 'Wwwision\ImportService\DataSource\DbalSource'
+#          options:
+#            backendOptions:
+#              dbname: 'some-db-name'
+#            table: 'source-table'
+#          fixture:
+#            file: 'resource://some/file'
+#          postProcessor: 'Some\Package::processRecords'
+#        target:
+#          className: 'Wwwision\ImportService\DataTarget\DbalTarget'
+#          options:
+#            table: 'target-table'
+#            idColumn: 'slug'
+#            versionColumn: 'version'
+#        mapping:
+#          'slug': 'id'
+#          'givenname': '${String.firstLetterToUpperCase(record.firstName)}'
+#          'familyname': 'lastname'
+#          'version': 'revision'
