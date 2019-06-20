@@ -1,15 +1,13 @@
 type: dictionary
 additionalProperties: false
 properties:
-  'presets':
+  'presetTemplates':
     type: dictionary
     required: true
     additionalProperties:
       type: dictionary
       additionalProperties: false
-      properties:
-        'template':
-          type: string
+      properties: &presetProperties
         'syncOnly':
           type: boolean
         'source':
@@ -46,3 +44,14 @@ properties:
           type: dictionary
           additionalProperties:
             type: string
+
+  'presets':
+    type: dictionary
+    required: true
+    additionalProperties:
+      type: dictionary
+      additionalProperties: false
+      properties:
+        <<: *presetProperties
+        template:
+          type: string

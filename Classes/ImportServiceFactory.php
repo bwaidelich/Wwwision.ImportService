@@ -16,6 +16,12 @@ final class ImportServiceFactory
 {
 
     /**
+     * @Flow\InjectConfiguration(path="presetTemplates")
+     * @var array
+     */
+    protected $presetTemplates;
+
+    /**
      * @Flow\InjectConfiguration(path="presets")
      * @var array
      */
@@ -51,10 +57,10 @@ final class ImportServiceFactory
         }
         $presetConfiguration = $this->presets[$presetName];
         if (\array_key_exists('template', $presetConfiguration)) {
-            if (!\array_key_exists($presetConfiguration['template'], $this->presets)) {
-                throw new \RuntimeException(sprintf('Preset "%s" refers to a non-existing template preset "%s"', $presetName, $presetConfiguration['template']), 1558951624);
+            if (!\array_key_exists($presetConfiguration['template'], $this->presetTemplates)) {
+                throw new \RuntimeException(sprintf('Preset "%s" refers to a non-existing preset template "%s"', $presetName, $presetConfiguration['template']), 1558951624);
             }
-            $presetConfiguration = Arrays::arrayMergeRecursiveOverrule($this->presets[$presetConfiguration['template']], $presetConfiguration);
+            $presetConfiguration = Arrays::arrayMergeRecursiveOverrule($this->presetTemplates[$presetConfiguration['template']], $presetConfiguration);
         }
         try {
             return Preset::fromConfiguration($presetConfiguration);
