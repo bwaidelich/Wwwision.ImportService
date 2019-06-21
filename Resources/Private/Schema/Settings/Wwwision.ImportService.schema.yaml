@@ -8,7 +8,9 @@ properties:
       type: dictionary
       additionalProperties: false
       properties: &presetProperties
-        'syncOnly':
+        'skipNewRecords':
+          type: boolean
+        'skipRemovedRecords':
           type: boolean
         'source':
           type: dictionary

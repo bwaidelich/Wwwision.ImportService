@@ -89,8 +89,11 @@ final class ImportService
         $data = $this->preset->load();
         $changeSet = $this->preset->computeDataChanges($data, $forceUpdates);
         $this->dispatch(self::EVENT_PRE_IMPORT_DATA, $changeSet);
-        if ($this->preset->isSyncOnly() && ($changeSet->hasDataToAdd() || $changeSet->hasDataToRemove())) {
-            throw new ImportServiceException('This preset is marked "sync only", so no nodes must be added or removed. Check your configuration and consider executing migrations', 1528889870);
+        if ($this->preset->isSkipAddedRecords() && $changeSet->hasDataToAdd()) {
+            throw new ImportServiceException('This preset is configured to skip added records, but the data target returned new records. Check your configuration and consider executing migrations', 1528889870);
+        }
+        if ($this->preset->isSkipRemovedRecords() && $changeSet->hasDataToRemove()) {
+            throw new ImportServiceException('This preset is configured to skip removed records, but the data target returned removed records. Check your configuration and consider executing migrations', 1561122090);
         }
 
         $this->addData($changeSet->addedRecords());
@@ -107,8 +110,8 @@ final class ImportService
      */
     public function removeAllData(): int
     {
-        if ($this->preset->isSyncOnly()) {
-            throw new ImportServiceException('This preset is marked "sync only", so no nodes must be removed.', 1550139159);
+        if ($this->preset->isSkipAddedRecords() || $this->preset->isSkipRemovedRecords()) {
+            throw new ImportServiceException('This preset is configured to skip added/removed records, so no local records must be removed.', 1550139159);
         }
         try {
             $result = $this->preset->removeAll();

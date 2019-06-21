@@ -15,7 +15,7 @@ interface DataTargetInterface
 {
     public static function createWithMapperAndOptions(Mapper $mapper, array $options): self;
 
-    public function computeDataChanges(DataRecords $records, bool $forceUpdates): ChangeSet;
+    public function computeDataChanges(DataRecords $records, bool $forceUpdates, bool $skipAddedRecords, bool $skipRemovedRecords): ChangeSet;
 
     public function addRecord(DataRecordInterface $record): void;
 

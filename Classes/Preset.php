@@ -26,20 +26,26 @@ final class Preset
     private $dataTarget;
 
     /**
-     * @var bool if true only updates are allowed - new or removed records will lead to an exception
+     * @var bool if true no new records will be added - even if they don't exist locally
      */
-    private $isSyncOnly;
+    private $skipAddedRecords;
+
+    /**
+     * @var bool if true no new records will be removed - even if they don't exist externally any longer
+     */
+    private $skipRemovedRecords;
 
     /**
      * @var ?callable
      */
     private $dataSourceProcessor;
 
-    protected function __construct(DataSourceInterface $dataSource, DataTargetInterface $dataTarget, bool $isSyncOnly, $dataSourceProcessor)
+    protected function __construct(DataSourceInterface $dataSource, DataTargetInterface $dataTarget, bool $skipAddedRecords, bool $skipRemovedRecords, $dataSourceProcessor)
     {
         $this->dataSource = $dataSource;
         $this->dataTarget = $dataTarget;
-        $this->isSyncOnly = $isSyncOnly;
+        $this->skipAddedRecords = $skipAddedRecords;
+        $this->skipRemovedRecords = $skipRemovedRecords;
         $this->dataSourceProcessor = $dataSourceProcessor;
     }
 
@@ -81,19 +87,25 @@ final class Preset
         if (!$dataTarget instanceof DataTargetInterface) {
             throw new \RuntimeException(sprintf('The configured "target.className" is not an instance of %s', DataTargetInterface::class), 1557238877);
         }
-        $isSyncOnly = $configuration['syncOnly'] ?? false;
+        $skipAddedRecords = $configuration['skipAddedRecords'] ?? false;
+        $skipRemovedRecords = $configuration['skipRemovedRecords'] ?? false;
         $dataSourceProcessor = isset($configuration['source']['postProcessor']) ? explode('::', $configuration['source']['postProcessor'], 2) : null;
-        return new static($dataSource, $dataTarget, $isSyncOnly, $dataSourceProcessor);
+        return new static($dataSource, $dataTarget, $skipAddedRecords, $skipRemovedRecords, $dataSourceProcessor);
     }
 
     public function withDataSource(DataSourceInterface $dataSource): self
     {
-        return new static($dataSource, $this->dataTarget, $this->isSyncOnly, $this->dataSourceProcessor);
+        return new static($dataSource, $this->dataTarget, $this->skipAddedRecords, $this->skipRemovedRecords, $this->dataSourceProcessor);
     }
 
-    public function isSyncOnly(): bool
+    public function isSkipAddedRecords(): bool
     {
-        return $this->isSyncOnly;
+        return $this->skipAddedRecords;
+    }
+
+    public function isSkipRemovedRecords(): bool
+    {
+        return $this->skipRemovedRecords;
     }
 
     public function load(): DataRecords
@@ -107,7 +119,7 @@ final class Preset
 
     public function computeDataChanges(DataRecords $records, bool $forceUpdates): ChangeSet
     {
-        return $this->dataTarget->computeDataChanges($records, $forceUpdates);
+        return $this->dataTarget->computeDataChanges($records, $forceUpdates, $this->skipAddedRecords, $this->skipRemovedRecords);
     }
 
     public function addRecord(DataRecordInterface $record): void

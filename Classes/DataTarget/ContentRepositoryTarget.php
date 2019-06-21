@@ -145,7 +145,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
     }
 
-    public function computeDataChanges(DataRecords $records, bool $forceUpdates): ChangeSet
+    public function computeDataChanges(DataRecords $records, bool $forceUpdates, bool $skipAddedRecords, bool $skipRemovedRecords): ChangeSet
     {
         // We use the "lastPublicationDateTime" field of NodeData because "lastModificationDateTime" is updated by a Doctrine hook and can't be set manually:
         $query = $this->doctrineEntityManager->createQuery('SELECT n.identifier, n.lastPublicationDateTime, n.hidden FROM ' . NodeData::class . ' n WHERE n.nodeType IN (:nodeTypeNames)');
@@ -166,7 +166,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
         $activeNodeDataIds = DataIds::fromStringArray($activeNodeDataIdentifiers);
         $allNodeDataIds = DataIds::fromStringArray($allNodeDataIdentifiers);
-        $removedIds = $activeNodeDataIds->diff($records->getIds());
+        $removedIds = $skipRemovedRecords ? DataIds::createEmpty() : $activeNodeDataIds->diff($records->getIds());
         $localDataLastModificationDates = array_column($nodeDataRecords, 'lastPublicationDateTime', 'identifier');
 
         $isUpdatedClosure = static function(DataRecordInterface $record) use ($localDataLastModificationDates) {
@@ -184,7 +184,9 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $addedRecords = DataRecords::createEmpty();
         foreach ($records as $record) {
             if (!$allNodeDataIds->has($record->id())) {
-                $addedRecords = $addedRecords->withRecord($record);
+                if (!$skipAddedRecords) {
+                    $addedRecords = $addedRecords->withRecord($record);
+                }
                 continue;
             }
             if ($forceUpdates || $isUpdatedClosure($record)) {

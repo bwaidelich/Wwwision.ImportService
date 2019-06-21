@@ -94,16 +94,18 @@ final class DbalTarget implements DataTargetInterface
         $this->dbal = DriverManager::getConnection($backendOptions);
     }
 
-    public function computeDataChanges(DataRecords $records, bool $forceUpdates): ChangeSet
+    public function computeDataChanges(DataRecords $records, bool $forceUpdates, bool $skipAddedRecords, bool $skipRemovedRecords): ChangeSet
     {
         $localIds = $this->getLocalIds();
-        $removedIds = $localIds->diff($records->getIds());
+        $removedIds = $skipRemovedRecords ? DataIds::createEmpty() : $localIds->diff($records->getIds());
 
         $updatedRecords = DataRecords::createEmpty();
         $addedRecords = DataRecords::createEmpty();
         foreach ($records as $record) {
             if (!$localIds->has($record->id())) {
-                $addedRecords = $addedRecords->withRecord($record);
+                if (!$skipAddedRecords) {
+                    $addedRecords = $addedRecords->withRecord($record);
+                }
                 continue;
             }
             if ($forceUpdates || $this->isRecordUpdated($record)) {
