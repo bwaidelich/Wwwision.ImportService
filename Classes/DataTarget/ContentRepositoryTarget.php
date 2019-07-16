@@ -20,7 +20,6 @@ use Neos\ContentRepository\Exception\NodeTypeNotFoundException;
 use Neos\ContentRepository\Utility;
 use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Core\Cache\ContentCache;
-use Neos\Utility\Arrays;
 use Neos\Utility\ObjectAccess;
 use Wwwision\ImportService\ValueObject\DataVersion;
 
@@ -95,11 +94,6 @@ final class ContentRepositoryTarget implements DataTargetInterface
      * @var array
      */
     private $cacheTagsToFlush = [];
-
-    /**
-     * @var array
-     */
-    private $cachedNodeTypeDefaultValues = [];
 
     /**
      * @var int
@@ -322,26 +316,12 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $mappedValues = array_filter($this->mapper->mapRecord($record), static function($value) {
             return $value !== null;
         });
-        $properties = Arrays::arrayMergeRecursiveOverrule($this->getDefaultValuesForProperties($nodeData), $mappedValues);
-        foreach ($properties as $propertyName => $propertyValue) {
+        foreach ($mappedValues as $propertyName => $propertyValue) {
             $nodeData->setProperty($propertyName, $propertyValue);
         }
         if ($record->hasAttribute('_timestamp')) {
             $nodeData->setLastPublicationDateTime($record->attribute('_timestamp'));
         }
-    }
-
-    private function getDefaultValuesForProperties(NodeData $nodeData): array
-    {
-        try {
-            $nodeType = $nodeData->getNodeType();
-        } catch (NodeTypeNotFoundException $exception) {
-            throw new \RuntimeException(sprintf('Could not resolve node type of node %s', $nodeData->getIdentifier()), 1558357041, $exception);
-        }
-        if (!\array_key_exists($nodeType->getName(), $this->cachedNodeTypeDefaultValues)) {
-            $this->cachedNodeTypeDefaultValues[$nodeType->getName()] = $nodeType->getDefaultValuesForProperties();
-        }
-        return $this->cachedNodeTypeDefaultValues[$nodeType->getName()];
     }
 
     private function getNodeDataByPath(string $nodePath): NodeData
