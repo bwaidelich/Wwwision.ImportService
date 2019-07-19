@@ -406,8 +406,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
 
         $this->doctrineEntityManager->persist($newNodeData);
-        // TODO implement registerNodeDataChange()
-        //$this->registerNodeDataChange($newNodeData);
+        $this->registerNodeDataChange($newNodeData);
         return $newNodeData;
     }
 }
