@@ -277,8 +277,9 @@ final class ContentRepositoryTarget implements DataTargetInterface
     public function removeAll(): int
     {
         $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.path LIKE :pathPrefix AND n.nodeType IN (:nodeTypeNames)');
+        $nodePath = $this->eelRenderer->evaluateIfExpression($this->nodePath, []);
         $query->setParameters([
-            'pathPrefix' => $this->nodePath . '/%',
+            'pathPrefix' => $nodePath . '/%',
             'nodeTypeNames' => $this->affectedNodeTypeNames(),
         ]);
         $result = $query->execute();
