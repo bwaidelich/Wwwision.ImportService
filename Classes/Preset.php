@@ -60,7 +60,7 @@ final class Preset
         try {
             $dataSource = $dataSourceClassName::createWithOptions($configuration['source']['options'] ?? []);
         } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Exception while instantiating data source (%s)', $configuration['source']['className']), 1557999968, $exception);
+            throw new \RuntimeException(sprintf('Exception while instantiating data source (%s): %s', $configuration['source']['className'], $exception->getMessage()), 1557999968, $exception);
         }
         if (!$dataSource instanceof DataSourceInterface) {
             throw new \RuntimeException(sprintf('The configured "source.className" is not an instance of %s', DataSourceInterface::class), 1557238800);
@@ -71,7 +71,7 @@ final class Preset
         try {
             $mapper = Mapper::fromArray($configuration['mapping']);
         } catch (\Exception $exception) {
-            throw new \RuntimeException('Exception while instantiating Mapper', 1558096738, $exception);
+            throw new \RuntimeException(sprintf('Exception while instantiating Mapper: %s', $exception->getMessage()), 1558096738, $exception);
         }
 
         if (!isset($configuration['target']['className'])) {
@@ -82,7 +82,7 @@ final class Preset
         try {
             $dataTarget = $dataTargetClassName::createWithMapperAndOptions($mapper, $configuration['target']['options'] ?? []);
         } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Exception while instantiating data target (%s)', $configuration['target']['className']), 1558000004, $exception);
+            throw new \RuntimeException(sprintf('Exception while instantiating data target (%s): %s', $configuration['target']['className'], $exception->getMessage()), 1558000004, $exception);
         }
         if (!$dataTarget instanceof DataTargetInterface) {
             throw new \RuntimeException(sprintf('The configured "target.className" is not an instance of %s', DataTargetInterface::class), 1557238877);
