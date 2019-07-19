@@ -3,7 +3,7 @@ additionalProperties: false
 properties:
   'presetTemplates':
     type: dictionary
-    required: true
+    required: false
     additionalProperties:
       type: dictionary
       additionalProperties: false
