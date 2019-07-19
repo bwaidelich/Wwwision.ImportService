@@ -54,7 +54,7 @@ final class DbalTarget implements DataTargetInterface
     private $idColumn;
 
     /**
-     * @var string
+     * @var string|null
      */
     private $versionColumn;
 
@@ -76,7 +76,7 @@ final class DbalTarget implements DataTargetInterface
         }
         $this->tableName = $options['table'];
         $this->idColumn = $options['idColumn'] ?? 'id';
-        $this->versionColumn = $options['versionColumn'] ?? 'version';
+        $this->versionColumn = $options['versionColumn'] ?? null;
         $this->customBackendOptions = $options['backendOptions'] ?? [];
     }
 
@@ -122,6 +122,9 @@ final class DbalTarget implements DataTargetInterface
 
     private function localVersion(DataId $dataId): DataVersion
     {
+        if ($this->versionColumn === null) {
+            return DataVersion::none();
+        }
         if ($this->localVersionsCache === null) {
             $this->localVersionsCache = array_column($this->localRows(), $this->versionColumn, $this->idColumn);
         }
@@ -146,7 +149,11 @@ final class DbalTarget implements DataTargetInterface
     private function localRows(): array
     {
         if ($this->localRowsCache === null) {
-            $this->localRowsCache = $this->dbal->fetchAll(sprintf('SELECT %s, %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->versionColumn), $this->dbal->quoteIdentifier($this->tableName)));
+            if ($this->versionColumn === null) {
+                $this->localRowsCache = $this->dbal->fetchAll(sprintf('SELECT %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->tableName)));
+            } else {
+                $this->localRowsCache = $this->dbal->fetchAll(sprintf('SELECT %s, %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->versionColumn), $this->dbal->quoteIdentifier($this->tableName)));
+            }
         }
         return $this->localRowsCache;
     }
