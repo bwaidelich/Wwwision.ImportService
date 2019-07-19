@@ -76,6 +76,11 @@ final class ContentRepositoryTarget implements DataTargetInterface
     private $nodeName;
 
     /**
+     * @var string|null
+     */
+    private $idPrefix;
+
+    /**
      * @var NodeType|null
      */
     private $cachedNodeType;
@@ -113,6 +118,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
         $this->nodePath = rtrim($options['nodePath'], '\/');
         $this->nodeName = $options['nodeName'] ?? null;
+        $this->idPrefix = $options['idPrefix'] ?? null;
     }
 
     public function injectNodeTypeManager(NodeTypeManager $nodeTypeManager): void
@@ -153,6 +159,9 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $activeNodeDataIdentifiers = [];
         $allNodeDataIdentifiers = [];
         foreach ($nodeDataRecords as $nodeData) {
+            if ($this->idPrefix !== null) {
+                $nodeData['identifier'] = substr($nodeData['identifier'], \strlen($this->idPrefix));
+            }
             if ((int)$nodeData['hidden'] !== 1) {
                 $activeNodeDataIdentifiers[] = (string)$nodeData['identifier'];
             }
@@ -226,12 +235,21 @@ final class ContentRepositoryTarget implements DataTargetInterface
         } else {
             $nodeName = NodePaths::generateRandomNodeName();
         }
-        $nodeData = $this->createNodeData($parentNodeData, $nodeName, $this->nodeType(), $record->id()->toString());
+        $nodeData = $this->createNodeData($parentNodeData, $nodeName, $this->nodeType(), $this->prefixNodeIdentifier($record->id()));
         $this->mapNodeData($nodeData, $record);
         $this->registerNodeDataChange($nodeData);
         if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
             $this->doctrineEntityManager->flush();
         }
+    }
+
+    private function prefixNodeIdentifier(DataId $dataId): string
+    {
+        $id = $dataId->toString();
+        if ($this->idPrefix !== null) {
+            $id = $this->idPrefix . $id;
+        }
+        return $id;
     }
 
     public function updateRecord(DataRecordInterface $record): void
@@ -346,22 +364,24 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     private function getNodeDataByDataId(DataId $dataId): NodeData
     {
-        if (!\array_key_exists($dataId->toString(), $this->cachedNodesById)) {
-            try {
-                $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.identifier = :identifier AND n.workspace = :liveWorkspaceName');
-                $query->setParameters([
-                    'identifier' => $dataId,
-                    'liveWorkspaceName' => 'live',
-                ]);
-                $this->cachedNodesById[$dataId->toString()] = $query->getOneOrNullResult();
-            } catch (NonUniqueResultException $exception) {
-                throw new \RuntimeException(sprintf('Selecting node %s returned a non unique result.', $dataId), 1558078426, $exception);
-            }
-            if ($this->cachedNodesById[$dataId->toString()] === null) {
-                throw new \RuntimeException(sprintf('Could not find node %s.', $dataId), 1529323300);
-            }
+        $nodeId = $this->prefixNodeIdentifier($dataId);
+        if (\array_key_exists($nodeId, $this->cachedNodesById)) {
+            return $this->cachedNodesById[$nodeId];
         }
-        return $this->cachedNodesById[$dataId->toString()];
+        try {
+            $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.identifier = :identifier AND n.workspace = :liveWorkspaceName');
+            $query->setParameters([
+                'identifier' => $nodeId,
+                'liveWorkspaceName' => 'live',
+            ]);
+            $this->cachedNodesById[$nodeId] = $query->getOneOrNullResult();
+        } catch (NonUniqueResultException $exception) {
+            throw new \RuntimeException(sprintf('Selecting node "%s" returned a non unique result.', $nodeId), 1558078426, $exception);
+        }
+        if ($this->cachedNodesById[$nodeId] === null) {
+            throw new \RuntimeException(sprintf('Could not find node "%s".', $nodeId), 1529323300);
+        }
+        return $this->cachedNodesById[$nodeId];
     }
 
     /**
