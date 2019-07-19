@@ -164,7 +164,7 @@ final class DbalTarget implements DataTargetInterface
      */
     public function addRecord(DataRecordInterface $record): void
     {
-        $this->dbal->insert($this->tableName, $this->mapper->mapRecord($record));
+        $this->dbal->insert($this->tableName, $this->mapper->mapRecord($record, []));
     }
 
     /**
@@ -173,7 +173,7 @@ final class DbalTarget implements DataTargetInterface
      */
     public function updateRecord(DataRecordInterface $record): void
     {
-        $this->dbal->update($this->tableName, $this->mapper->mapRecord($record), [$this->idColumn => $record->id()->toString()]);
+        $this->dbal->update($this->tableName, $this->mapper->mapRecord($record, []), [$this->idColumn => $record->id()->toString()]);
     }
 
     /**

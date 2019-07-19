@@ -36,16 +36,16 @@ final class Mapper
         return new static($mapping);
     }
 
-    public function mapRecord(DataRecordInterface $record): array
+    public function mapRecord(DataRecordInterface $record, array $additionalVariables): array
     {
         $result = [];
         foreach ($this->mapping as $targetColumnName => $configuration) {
-            $result[$targetColumnName] = $this->attributeValueForColumn($record, $targetColumnName);
+            $result[$targetColumnName] = $this->attributeValueForColumn($record, $targetColumnName, $additionalVariables);
         }
         return $result;
     }
 
-    public function attributeValueForColumn(DataRecordInterface $record, string $columnName)
+    private function attributeValueForColumn(DataRecordInterface $record, string $columnName, array $additionalVariables)
     {
         if (!isset($this->mapping[$columnName])) {
             throw new \RuntimeException(sprintf('Missing mapping configuration for column "%s"', $columnName), 1558010499);
@@ -54,7 +54,9 @@ final class Mapper
         if (!$this->eelRenderer->isEelExpression($attributeMapping)) {
             return $record->hasAttribute($attributeMapping) ? $record->attribute($attributeMapping) : null;
         }
-        return $this->eelRenderer->evaluate($attributeMapping, ['record' => $record]);
+        $variables = $additionalVariables;
+        $variables['record'] = $record;
+        return $this->eelRenderer->evaluate($attributeMapping, $variables);
     }
 
 }

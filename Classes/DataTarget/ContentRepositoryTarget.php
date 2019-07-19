@@ -313,7 +313,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     private function mapNodeData(NodeData $nodeData, DataRecordInterface $record): void
     {
-        $mappedValues = array_filter($this->mapper->mapRecord($record), static function($value) {
+        $mappedValues = array_filter($this->mapper->mapRecord($record, ['nodeData' => $nodeData]), static function($value) {
             return $value !== null;
         });
         foreach ($mappedValues as $propertyName => $propertyValue) {
