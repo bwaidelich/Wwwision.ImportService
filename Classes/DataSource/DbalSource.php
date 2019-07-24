@@ -1,21 +1,25 @@
 <?php
 namespace Wwwision\ImportService\DataSource;
 
-use Wwwision\ImportService\ValueObject\DataId;
-use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\DriverManager;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\Arrays;
+use Wwwision\ImportService\OptionsSchema;
+use Wwwision\ImportService\ValueObject\DataId;
+use Wwwision\ImportService\ValueObject\DataRecords;
 use Wwwision\ImportService\ValueObject\DataVersion;
 use Wwwision\ImportService\ValueObject\LazyLoadingDataRecord;
 
+/**
+ * DBAL Data Source that allows to import records from a database table
+ */
 final class DbalSource implements DataSourceInterface
 {
 
     /**
-     * @var array
+     * @var array|null
      */
     private $customBackendOptions;
 
@@ -48,18 +52,26 @@ final class DbalSource implements DataSourceInterface
     /**
      * @var bool
      */
-    private $lazyloading;
+    private $lazyLoading;
 
     protected function __construct(array $options)
     {
-        if (!isset($options['table'])) {
-            throw new \InvalidArgumentException('Missing option "table"', 1557999786);
-        }
         $this->tableName = $options['table'];
         $this->idColumn = $options['idColumn'] ?? 'id';
         $this->versionColumn = $options['versionColumn'] ?? null;
-        $this->customBackendOptions = $options['backendOptions'] ?? [];
-        $this->lazyloading = $options['lazyloading'] ?? false;
+        $this->customBackendOptions = $options['backendOptions'] ?? null;
+        $this->lazyLoading = $options['lazyLoading'] ?? false;
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()
+            ->requires('table', 'string')
+            ->has('idColumn', 'string')
+            ->has('versionColumn', 'string')
+            ->has('backendOptions', 'array')
+            ->has('lazyLoading', 'boolean')
+            ->allowAdditionalOptions();
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
@@ -72,13 +84,20 @@ final class DbalSource implements DataSourceInterface
      */
     public function initializeObject(): void
     {
+        if ($this->customBackendOptions === null) {
+            $this->dbal = DriverManager::getConnection($this->flowBackendOptions);
+            return;
+        }
+        if (!\is_array($this->customBackendOptions)) {
+            throw new \RuntimeException(sprintf('Option "backendOptions" must resolve to an array, given: %s', \is_object($this->customBackendOptions) ? \get_class($this->customBackendOptions) : \gettype($this->customBackendOptions)), 1563880453);
+        }
         $backendOptions = Arrays::arrayMergeRecursiveOverrule($this->flowBackendOptions, $this->customBackendOptions);
         $this->dbal = DriverManager::getConnection($backendOptions);
     }
 
     public function load(): DataRecords
     {
-        if ($this->lazyloading) {
+        if ($this->lazyLoading) {
             return $this->loadLazily();
         }
 

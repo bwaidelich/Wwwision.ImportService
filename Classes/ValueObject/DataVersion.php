@@ -49,7 +49,7 @@ final class DataVersion
         try {
             $date = new \DateTimeImmutable($dateString, $dateTimeZone);
         } catch (\Exception $e) {
-            throw new \InvalidArgumentException(sprintf('Could not parse "%s" as date', $dateString), 1560525412);
+            throw new \InvalidArgumentException(sprintf('Could not parse "%s" as date', $dateString), 1560525412, $e);
         }
         return self::fromDateTime($date);
     }
@@ -73,9 +73,9 @@ final class DataVersion
             return self::fromDateString($value, null);
         }
         if (\is_object($value)) {
-            throw new \InvalidArgumentException(sprintf('Could not parse object of type %s as DataVersion', get_class($value)), 1560523738);
+            throw new \InvalidArgumentException(sprintf('Could not parse object of type %s as DataVersion', \get_class($value)), 1560523738);
         }
-        throw new \InvalidArgumentException(sprintf('Could not parse %s "%s" as DataVersion', gettype($value), $value), 1560526428);
+        throw new \InvalidArgumentException(sprintf('Could not parse %s "%s" as DataVersion', \gettype($value), $value), 1560526428);
     }
 
     public function toNumber(): int

@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Wwwision\ImportService\DataTarget;
 
 use Wwwision\ImportService\Mapper;
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataRecordInterface;
@@ -14,6 +15,8 @@ use Wwwision\ImportService\ValueObject\DataRecords;
 interface DataTargetInterface
 {
     public static function createWithMapperAndOptions(Mapper $mapper, array $options): self;
+
+    public static function getOptionsSchema(): OptionsSchema;
 
     public function computeDataChanges(DataRecords $records, bool $forceUpdates, bool $skipAddedRecords, bool $skipRemovedRecords): ChangeSet;
 

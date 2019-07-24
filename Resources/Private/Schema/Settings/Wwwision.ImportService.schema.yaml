@@ -8,11 +8,18 @@ properties:
       type: dictionary
       additionalProperties: false
       properties: &presetProperties
-        'skipNewRecords':
-          type: boolean
-        'skipRemovedRecords':
-          type: boolean
+        'options':
+          type: dictionary
+          properties:
+            'skipNewRecords':
+              type: boolean
+            'skipRemovedRecords':
+              type: boolean
+            'dataPostProcessor':
+              type: string
+              pattern: '/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff\\]*::[a-zA-Z_\x7f-\xff]*$/u'
         'source':
+          required: true
           type: dictionary
           additionalProperties: false
           properties:
@@ -30,10 +37,8 @@ properties:
                   type: string
             'options':
               type: dictionary
-            'postProcessor':
-              type: string
-              pattern: '/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff\\]*::[a-zA-Z_\x7f-\xff]*$/u'
         'target':
+          required: true
           type: dictionary
           additionalProperties: false
           properties:
@@ -43,6 +48,7 @@ properties:
             options:
               type: dictionary
         'mapping':
+          required: true
           type: dictionary
           additionalProperties:
             type: string

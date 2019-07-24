@@ -38,10 +38,11 @@ final class ImportServiceFactory
         if (!isset($this->presets[$presetName]['source']['fixture']['file'])) {
             throw new \RuntimeException(sprintf('Missing "source.fixture.file" configuration for preset "%s"', $presetName), 1558433554);
         }
-        $fixtureSource = FileSource::createWithOptions([
+        $fixtureOptions = [
             'filePath' => $this->presets[$presetName]['source']['fixture']['file'],
             'idAttributeName' => $this->presets[$presetName]['source']['fixture']['idAttributeName'] ?? 'id',
-        ]);
+        ];
+        $fixtureSource = FileSource::createWithOptions($fixtureOptions);
         return new ImportService($preset->withDataSource($fixtureSource));
     }
 

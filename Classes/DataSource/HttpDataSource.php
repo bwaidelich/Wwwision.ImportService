@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
 use Wwwision\ImportService\ImportServiceException;
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Http\Client\Browser;
@@ -10,6 +11,9 @@ use Neos\Flow\Http\Client\CurlEngineException;
 use Neos\Flow\Http\Request;
 use Neos\Flow\Http\Uri;
 
+/**
+ * HTTP Data Source that allows to import records from some HTTP endpoint
+ */
 final class HttpDataSource implements DataSourceInterface
 {
 
@@ -36,12 +40,17 @@ final class HttpDataSource implements DataSourceInterface
 
     protected function __construct(array $options)
     {
-        if (empty($options['endpoint'])) {
-            throw new \InvalidArgumentException('Missing "endpoint" option', 1557128187);
-        }
         $this->endpoint = new Uri($options['endpoint']);
         $this->idAttributeName = $options['idAttributeName'] ?? 'id';
         $this->versionAttributeName = $options['versionAttributeName'] ?? null;
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()
+            ->requires('endpoint', 'string')
+            ->has('idAttributeName', 'string')
+            ->has('versionAttributeName', 'string');
     }
 
     public static function createWithOptions(array $options): DataSourceInterface

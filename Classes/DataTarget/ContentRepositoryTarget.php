@@ -2,15 +2,17 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataTarget;
 
-use Wwwision\ImportService\EelEvaluator;
+use Doctrine\ORM\NonUniqueResultException;
+use Neos\ContentRepository\Domain\Model\NodeInterface;
+use Neos\Utility\TypeHandling;
 use Wwwision\ImportService\Mapper;
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
 use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\Query;
 use Neos\ContentRepository\Domain\Model\NodeData;
 use Neos\ContentRepository\Domain\Model\NodeType;
@@ -24,7 +26,9 @@ use Neos\Utility\ObjectAccess;
 use Wwwision\ImportService\ValueObject\DataVersion;
 
 /**
- * Neos Content Repository data target
+ * Neos Content Repository Data Target that allows to import records as nodes into the Neos ContentRepository
+ *
+ * Note: This Data Target requires the Neos.ContentRepository package to be installed
  */
 final class ContentRepositoryTarget implements DataTargetInterface
 {
@@ -50,35 +54,39 @@ final class ContentRepositoryTarget implements DataTargetInterface
     private $contentCache;
 
     /**
-     * @Flow\Inject
-     * @var EelEvaluator
-     */
-    protected $eelRenderer;
-
-    /**
      * @var Mapper
      */
     private $mapper;
 
     /**
-     * @var string[]
+     * @var string
      */
     private $nodeTypeName;
 
     /**
-     * @var string
-     */
-    private $nodePath;
-
-    /**
      * @var string|null
      */
-    private $nodeName;
+    private $rootNodePath;
+
+    /**
+     * @var callable|null
+     */
+    private $parentNodeResolver;
 
     /**
      * @var string|null
      */
     private $idPrefix;
+
+    /**
+     * @var callable|null
+     */
+    private $nodeVariantsResolver;
+
+    /**
+     * @var bool
+     */
+    private $softDelete;
 
     /**
      * @var NodeType|null
@@ -91,7 +99,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
     private $cachedNodesByPath = [];
 
     /**
-     * @var NodeData[]
+     * @var NodeData[][]
      */
     private $cachedNodesById = [];
 
@@ -109,16 +117,22 @@ final class ContentRepositoryTarget implements DataTargetInterface
     {
         $this->requireContentRepositoryPackage();
         $this->mapper = $mapper;
-        if (!isset($options['nodeType'])) {
-            throw new \InvalidArgumentException('Missing option "nodeType"', 1558014570);
-        }
+
         $this->nodeTypeName = $options['nodeType'];
-        if (!isset($options['nodePath'])) {
-            throw new \InvalidArgumentException('Missing option "nodePath"', 1558016570);
+        if (isset($options['rootNodePath'])) {
+            $this->rootNodePath = rtrim($options['rootNodePath'], '\/');
+        } elseif (isset($options['parentNodeResolver'])) {
+            [$className, $methodName] = explode('::', $options['parentNodeResolver'], 2);
+            $this->parentNodeResolver = [new $className(), $methodName];
+        } else {
+            throw new \InvalidArgumentException('Missing option "rootNodePath" and/or "parentNodeDataResolver"', 1558016570);
         }
-        $this->nodePath = rtrim($options['nodePath'], '\/');
-        $this->nodeName = $options['nodeName'] ?? null;
         $this->idPrefix = $options['idPrefix'] ?? null;
+        $this->softDelete = $options['softDelete'] ?? false;
+        if (isset($options['nodeVariantsResolver'])) {
+            [$className, $methodName] = explode('::', $options['nodeVariantsResolver'], 2);
+            $this->nodeVariantsResolver = [new $className(), $methodName];
+        }
     }
 
     public function injectNodeTypeManager(NodeTypeManager $nodeTypeManager): void
@@ -129,6 +143,17 @@ final class ContentRepositoryTarget implements DataTargetInterface
     public function injectContentCache(ContentCache $contentCache): void
     {
         $this->contentCache = $contentCache;
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()
+            ->requires('nodeType', 'string')
+            ->has('rootNodePath', 'string')
+            ->has('parentNodeResolver', 'callable')
+            ->has('idPrefix', 'string')
+            ->has('nodeVariantsResolver', 'callable')
+            ->has('softDelete', 'boolean');
     }
 
     public static function createWithMapperAndOptions(Mapper $mapper, array $options): DataTargetInterface
@@ -156,23 +181,21 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $nodeDataRecords = $query->execute([], Query::HYDRATE_ARRAY);
 
         // this filters hidden nodes. Otherwise they would end up in $dataToRemove every time
-        $activeNodeDataIdentifiers = [];
-        $allNodeDataIdentifiers = [];
+        $allIds = [];
+        $activeIds = [];
         foreach ($nodeDataRecords as $nodeData) {
-            if ($this->idPrefix !== null) {
-                $nodeData['identifier'] = substr($nodeData['identifier'], \strlen($this->idPrefix));
-            }
+            $recordIdentifier = $this->idPrefix !== null ? substr($nodeData['identifier'], \strlen($this->idPrefix)) : $nodeData['identifier'];
             if ((int)$nodeData['hidden'] !== 1) {
-                $activeNodeDataIdentifiers[] = (string)$nodeData['identifier'];
+                $activeIds[] = $recordIdentifier;
             }
-            $allNodeDataIdentifiers[] = (string)$nodeData['identifier'];
+            $allIds[] = $recordIdentifier;
         }
-        $activeNodeDataIds = DataIds::fromStringArray($activeNodeDataIdentifiers);
-        $allNodeDataIds = DataIds::fromStringArray($allNodeDataIdentifiers);
-        $removedIds = $skipRemovedRecords ? DataIds::createEmpty() : $activeNodeDataIds->diff($records->getIds());
+        $allDataIds = DataIds::fromStringArray($allIds);
+        $activeDataIds = DataIds::fromStringArray($activeIds);
+        $removedDataIds = $skipRemovedRecords ? DataIds::createEmpty() : $activeDataIds->diff($records->getIds());
         $localDataLastModificationDates = array_column($nodeDataRecords, 'lastPublicationDateTime', 'identifier');
 
-        $isUpdatedClosure = static function(DataRecordInterface $record) use ($localDataLastModificationDates) {
+        $isUpdatedClosure = static function (DataRecordInterface $record) use ($localDataLastModificationDates) {
             if ($record->version()->isNotSet()) {
                 return true;
             }
@@ -186,7 +209,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $updatedRecords = DataRecords::createEmpty();
         $addedRecords = DataRecords::createEmpty();
         foreach ($records as $record) {
-            if (!$allNodeDataIds->has($record->id())) {
+            if (!$allDataIds->has($record->id())) {
                 if (!$skipAddedRecords) {
                     $addedRecords = $addedRecords->withRecord($record);
                 }
@@ -196,7 +219,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
                 $updatedRecords = $updatedRecords->withRecord($record);
             }
         }
-        return ChangeSet::fromAddedUpdatedAndRemoved($addedRecords, $updatedRecords, $removedIds);
+        return ChangeSet::fromAddedUpdatedAndRemoved($addedRecords, $updatedRecords, $removedDataIds);
     }
 
 
@@ -227,61 +250,79 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     public function addRecord(DataRecordInterface $record): void
     {
-        $nodePath = $this->eelRenderer->evaluateIfExpression($this->nodePath, ['record' => $record]);
-        $parentNodeData = $this->getNodeDataByPath((string)$nodePath);
-
-        if ($this->nodeName !== null) {
-            $nodeName = $this->eelRenderer->evaluateIfExpression($this->nodeName, ['record' => $record]);
+        if ($this->parentNodeResolver !== null) {
+            $parentNode = \call_user_func($this->parentNodeResolver, $record);
+            if (!$parentNode instanceof NodeInterface) {
+                throw new \RuntimeException(sprintf('The "parentNodeResolver" must return an instance of %s, got: %s for record "%s"', NodeInterface::class, TypeHandling::getTypeForValue($parentNode), $record->id()), 1563977620);
+            }
+            /** @noinspection PhpDeprecationInspection */
+            $parentNodeData = $parentNode->getNodeData();
         } else {
-            $nodeName = NodePaths::generateRandomNodeName();
+            $parentNodeData = $this->getNodeDataByPath($this->rootNodePath);
         }
-        $nodeData = $this->createNodeData($parentNodeData, $nodeName, $this->nodeType(), $this->prefixNodeIdentifier($record->id()));
-        $this->mapNodeData($nodeData, $record);
-        $this->registerNodeDataChange($nodeData);
-        if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
-            $this->doctrineEntityManager->flush();
-        }
-    }
 
-    private function prefixNodeIdentifier(DataId $dataId): string
-    {
-        $id = $dataId->toString();
-        if ($this->idPrefix !== null) {
-            $id = $this->idPrefix . $id;
+        if ($this->nodeVariantsResolver !== null) {
+            $nodeVariants = \call_user_func($this->nodeVariantsResolver, $record);
+            if (!\is_array($nodeVariants)) {
+                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" must return an array, got: %s for record "%s"', TypeHandling::getTypeForValue($nodeVariants), $record->id()), 1563977893);
+            }
+            if ($nodeVariants === []) {
+                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" returned an empty array for record "%s"', $record->id()), 1563977956);
+            }
+        } else {
+            $nodeVariants = [$parentNodeData->getDimensionValues()];
         }
-        return $id;
+        foreach ($nodeVariants as $variantDimensionValues) {
+            $nodeIdentifier = $this->nodeIdentifier($record->id());
+            $nodeData = $this->createNodeData($parentNodeData, NodePaths::generateRandomNodeName(), $this->nodeType(), $nodeIdentifier, $variantDimensionValues);
+            $this->mapNodeData($nodeData, $record);
+            $this->registerNodeDataChange($nodeData);
+            if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
+                $this->doctrineEntityManager->flush();
+            }
+        }
     }
 
     public function updateRecord(DataRecordInterface $record): void
     {
-        $nodeData = $this->getNodeDataByDataId($record->id());
-        $this->mapNodeData($nodeData, $record);
-        $nodeData->setHidden(false);
-        $this->doctrineEntityManager->persist($nodeData);
-        $this->registerNodeDataChange($nodeData);
-        if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
-            $this->doctrineEntityManager->flush();
+        foreach ($this->getNodeDatasByDataId($record->id()) as $nodeData) {
+            $this->mapNodeData($nodeData, $record);
+            $nodeData->setHidden(false);
+            $this->doctrineEntityManager->persist($nodeData);
+            $this->registerNodeDataChange($nodeData);
+            if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
+                $this->doctrineEntityManager->flush();
+            }
         }
     }
 
     public function removeRecord(DataId $dataId): void
     {
-        $nodeData = $this->getNodeDataByDataId($dataId);
-        $nodeData->setHidden(true);
-        $this->registerNodeDataChange($nodeData);
-        if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
-            $this->doctrineEntityManager->flush();
+        foreach ($this->getNodeDatasByDataId($dataId) as $nodeData) {
+            if ($this->softDelete) {
+                $nodeData->setHidden(true);
+            } else {
+                $nodeData->remove();
+            }
+            $this->registerNodeDataChange($nodeData);
+            if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
+                $this->doctrineEntityManager->flush();
+            }
         }
     }
 
     public function removeAll(): int
     {
-        $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.path LIKE :pathPrefix AND n.nodeType IN (:nodeTypeNames)');
-        $nodePath = $this->eelRenderer->evaluateIfExpression($this->nodePath, []);
-        $query->setParameters([
-            'pathPrefix' => $nodePath . '/%',
-            'nodeTypeNames' => $this->affectedNodeTypeNames(),
-        ]);
+        if ($this->rootNodePath !== null) {
+            $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.path LIKE :pathPrefix AND n.nodeType IN (:nodeTypeNames)')->setParameters([
+                'pathPrefix' => $this->rootNodePath . '/%',
+                'nodeTypeNames' => $this->affectedNodeTypeNames(),
+            ]);
+        } else {
+            $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.nodeType IN (:nodeTypeNames)')->setParameters([
+                'nodeTypeNames' => $this->affectedNodeTypeNames(),
+            ]);
+        }
         $result = $query->execute();
         if ($result === null) {
             throw new \RuntimeException('Failed to remove affected nodes', 1558356631);
@@ -332,7 +373,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     private function mapNodeData(NodeData $nodeData, DataRecordInterface $record): void
     {
-        $mappedValues = array_filter($this->mapper->mapRecord($record, ['nodeData' => $nodeData]), static function($value) {
+        $mappedValues = array_filter($this->mapper->mapRecord($record, ['nodeData' => $nodeData]), static function ($value) {
             return $value !== null;
         });
         foreach ($mappedValues as $propertyName => $propertyValue) {
@@ -363,26 +404,31 @@ final class ContentRepositoryTarget implements DataTargetInterface
         return $this->cachedNodesByPath[$nodePath];
     }
 
-    private function getNodeDataByDataId(DataId $dataId): NodeData
+    /**
+     * @param DataId $dataId
+     * @return NodeData[]
+     */
+    private function getNodeDatasByDataId(DataId $dataId): array
     {
-        $nodeId = $this->prefixNodeIdentifier($dataId);
-        if (\array_key_exists($nodeId, $this->cachedNodesById)) {
-            return $this->cachedNodesById[$nodeId];
+        $nodeIdentifier = $this->nodeIdentifier($dataId);
+        if (\array_key_exists($nodeIdentifier, $this->cachedNodesById)) {
+            return $this->cachedNodesById[$nodeIdentifier];
         }
-        try {
-            $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.identifier = :identifier AND n.workspace = :liveWorkspaceName');
-            $query->setParameters([
-                'identifier' => $nodeId,
-                'liveWorkspaceName' => 'live',
-            ]);
-            $this->cachedNodesById[$nodeId] = $query->getOneOrNullResult();
-        } catch (NonUniqueResultException $exception) {
-            throw new \RuntimeException(sprintf('Selecting node "%s" returned a non unique result.', $nodeId), 1558078426, $exception);
+        $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.identifier = :identifier AND n.workspace = :liveWorkspaceName');
+        $query->setParameters([
+            'identifier' => $nodeIdentifier,
+            'liveWorkspaceName' => 'live',
+        ]);
+        $this->cachedNodesById[$nodeIdentifier] = $query->getResult();
+        if ($this->cachedNodesById[$nodeIdentifier] === []) {
+            throw new \RuntimeException(sprintf('Could not find node "%s".', $nodeIdentifier), 1529323300);
         }
-        if ($this->cachedNodesById[$nodeId] === null) {
-            throw new \RuntimeException(sprintf('Could not find node "%s".', $nodeId), 1529323300);
-        }
-        return $this->cachedNodesById[$nodeId];
+        return $this->cachedNodesById[$nodeIdentifier];
+    }
+
+    private function nodeIdentifier(DataId $dataId): string
+    {
+        return $this->idPrefix !== null ? $this->idPrefix . $dataId->toString() : $dataId->toString();
     }
 
     /**
@@ -394,17 +440,14 @@ final class ContentRepositoryTarget implements DataTargetInterface
      * @param string $name
      * @param NodeType $nodeType
      * @param string $identifier
-     * @param int $index
+     * @param array $dimensionValues
      * @return NodeData
      */
-    private function createNodeData(NodeData $parentNodeData, string $name, NodeType $nodeType, string $identifier, int $index = null): NodeData
+    private function createNodeData(NodeData $parentNodeData, string $name, NodeType $nodeType, string $identifier, array $dimensionValues): NodeData
     {
         $newNodePath = NodePaths::addNodePathSegment($parentNodeData->getPath(), $name);
-        $newNodeData = new NodeData($newNodePath, $parentNodeData->getWorkspace(), $identifier, $parentNodeData->getDimensionValues());
+        $newNodeData = new NodeData($newNodePath, $parentNodeData->getWorkspace(), $identifier, $dimensionValues);
         $newNodeData->setNodeType($nodeType);
-        if ($index !== null) {
-            $newNodeData->setIndex($index);
-        }
 
         foreach ($nodeType->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
             if (strncmp($propertyName, '_', 1) === 0) {
@@ -423,11 +466,12 @@ final class ContentRepositoryTarget implements DataTargetInterface
             }
             // Recursively create child node data for auto created child nodes.
             // This is very important because of the nested structure of many node types.
-            $this->createNodeData($newNodeData, $childNodeName, $childNodeType, $childNodeIdentifier);
+            $this->createNodeData($newNodeData, $childNodeName, $childNodeType, $childNodeIdentifier, $dimensionValues);
         }
 
         $this->doctrineEntityManager->persist($newNodeData);
         $this->registerNodeDataChange($newNodeData);
         return $newNodeData;
     }
+
 }

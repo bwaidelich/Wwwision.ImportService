@@ -2,8 +2,19 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
+/**
+ * This Data Source is mainly useful for testing.
+ *
+ * Example Mock Data Source:
+ *
+ * $mockDataSource = ClosureDataSource::forClosure(function(Options $options) { return $someMockDataRecords; });
+ * $importService = $this->importServiceFactory->createWithDataSource($presetName, $mockDataSource);
+ * // ...
+ *
+ */
 final class ClosureDataSource implements DataSourceInterface
 {
     /**
@@ -12,21 +23,33 @@ final class ClosureDataSource implements DataSourceInterface
     private $dataClosure;
 
     /**
-     * @param \Closure callback to be invoked if load() is called
+     * @var array
      */
-    protected function __construct(\Closure $dataClosure)
+    private $options;
+
+    /**
+     * @param \Closure callback to be invoked if load() is called
+     * @param array $options Arbitrary options that will be passed to the closure
+     */
+    protected function __construct(\Closure $dataClosure, array $options)
     {
         $this->dataClosure = $dataClosure;
+        $this->options = $options;
     }
 
-    public static function forClosure(\Closure $dataClosure): self
+    public static function forClosure(\Closure $dataClosure, array $options): self
     {
-        return new static($dataClosure);
+        return new static($dataClosure, $options);
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()->allowAdditionalOptions();
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
     {
-        return new static(static function() { return DataRecords::createEmpty();});
+        return new static(static function() { return DataRecords::createEmpty();}, $options);
     }
 
     /**
@@ -39,6 +62,6 @@ final class ClosureDataSource implements DataSourceInterface
 
     public function load(): DataRecords
     {
-        return \call_user_func($this->dataClosure);
+        return \call_user_func($this->dataClosure, $this->options);
     }
 }

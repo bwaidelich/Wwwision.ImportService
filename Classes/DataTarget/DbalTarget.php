@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Wwwision\ImportService\DataTarget;
 
 use Wwwision\ImportService\Mapper;
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
@@ -17,7 +18,7 @@ use Neos\Utility\Arrays;
 use Wwwision\ImportService\ValueObject\DataVersion;
 
 /**
- * DBAL data target
+ * DBAL Data Target that allows to import records into a database table
  */
 final class DbalTarget implements DataTargetInterface
 {
@@ -71,13 +72,19 @@ final class DbalTarget implements DataTargetInterface
     protected function __construct(Mapper $mapper, array $options)
     {
         $this->mapper = $mapper;
-        if (!isset($options['table'])) {
-            throw new \InvalidArgumentException('Missing option "table"', 1558001987);
-        }
         $this->tableName = $options['table'];
         $this->idColumn = $options['idColumn'] ?? 'id';
         $this->versionColumn = $options['versionColumn'] ?? null;
-        $this->customBackendOptions = $options['backendOptions'] ?? [];
+        $this->customBackendOptions = $options['customBackendOptions'] ?? null;
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()
+            ->requires('table', 'string')
+            ->has('idColumn', 'string')
+            ->has('versionColumn', 'string')
+            ->has('backendOptions', 'array');
     }
 
     public static function createWithMapperAndOptions(Mapper $mapper, array $options): DataTargetInterface
@@ -90,6 +97,13 @@ final class DbalTarget implements DataTargetInterface
      */
     public function initializeObject(): void
     {
+        if ($this->customBackendOptions === null) {
+            $this->dbal = DriverManager::getConnection($this->flowBackendOptions);
+            return;
+        }
+        if (!\is_array($this->customBackendOptions)) {
+            throw new \RuntimeException(sprintf('Option "backendOptions" must resolve to an array, given: %s', \is_object($this->customBackendOptions) ? \get_class($this->customBackendOptions) : \gettype($this->customBackendOptions)), 1563881291);
+        }
         $backendOptions = Arrays::arrayMergeRecursiveOverrule($this->flowBackendOptions, $this->customBackendOptions);
         $this->dbal = DriverManager::getConnection($backendOptions);
     }

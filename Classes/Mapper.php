@@ -14,7 +14,7 @@ final class Mapper
      * @Flow\Inject
      * @var EelEvaluator
      */
-    protected $eelRenderer;
+    protected $eel;
 
     /**
      * @var array
@@ -51,12 +51,12 @@ final class Mapper
             throw new \RuntimeException(sprintf('Missing mapping configuration for column "%s"', $columnName), 1558010499);
         }
         $attributeMapping = $this->mapping[$columnName];
-        if (!$this->eelRenderer->isEelExpression($attributeMapping)) {
+        if (!$this->eel->isEelExpression($attributeMapping)) {
             return $record->hasAttribute($attributeMapping) ? $record->attribute($attributeMapping) : null;
         }
         $variables = $additionalVariables;
         $variables['record'] = $record;
-        return $this->eelRenderer->evaluate($attributeMapping, $variables);
+        return $this->eel->evaluate($attributeMapping, $variables);
     }
 
 }

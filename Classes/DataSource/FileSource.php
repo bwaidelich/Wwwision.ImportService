@@ -2,8 +2,12 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
+use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
+/**
+ * File Data Source that allows to import records from a file
+ */
 final class FileSource implements DataSourceInterface
 {
 
@@ -24,12 +28,17 @@ final class FileSource implements DataSourceInterface
 
     protected function __construct(array $options)
     {
-        if (!isset($options['filePath'])) {
-            throw new \InvalidArgumentException('Missing option "filePath"', 1558015623);
-        }
         $this->filePath = $options['filePath'];
         $this->idAttributeName = $options['idAttributeName'] ?? 'id';
         $this->versionAttributeName = $options['versionAttributeName'] ?? null;
+    }
+
+    public static function getOptionsSchema(): OptionsSchema
+    {
+        return OptionsSchema::create()
+            ->requires('filePath', 'string')
+            ->has('idAttributeName', 'string')
+            ->has('versionAttributeName', 'string');
     }
 
     public static function createWithOptions(array $options): DataSourceInterface
