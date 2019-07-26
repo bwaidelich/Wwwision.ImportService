@@ -347,11 +347,14 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
         $workspaceHash = '%d0dbe915091d400bd8ee7f27f0791303%'; // === CachingHelper::renderWorkspaceTagForContextNode('live');
         $this->cacheTagsToFlush['Node_' . $workspaceHash . '_' . $nodeData->getIdentifier()] = true;
+        $this->cacheTagsToFlush['Node_'  . $nodeData->getIdentifier()] = true;
         $this->cacheTagsToFlush['NodeType_' . $workspaceHash . '_' . $nodeType->getName()] = true;
+        $this->cacheTagsToFlush['NodeType_' . $nodeType->getName()] = true;
 
         $ascendantNode = $nodeData;
         while ($ascendantNode !== null && $ascendantNode->getDepth() > 1) {
             $this->cacheTagsToFlush['DescendantOf_' . $workspaceHash . '_' . $ascendantNode->getIdentifier()] = true;
+            $this->cacheTagsToFlush['DescendantOf_' . $ascendantNode->getIdentifier()] = true;
             $ascendantNode = $ascendantNode->getParent();
         }
     }
