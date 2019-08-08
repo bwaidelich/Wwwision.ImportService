@@ -299,36 +299,31 @@ final class ContentRepositoryTarget implements DataTargetInterface
     public function removeRecord(DataId $dataId): void
     {
         foreach ($this->getNodeDatasByDataId($dataId) as $nodeData) {
-            if ($this->softDelete) {
-                $nodeData->setHidden(true);
-            } else {
-                $nodeData->remove();
-            }
-            $this->registerNodeDataChange($nodeData);
-            if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
-                $this->doctrineEntityManager->flush();
-            }
+            $this->removeNodeData($nodeData);
         }
     }
 
     public function removeAll(): int
     {
         if ($this->rootNodePath !== null) {
-            $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.path LIKE :pathPrefix AND n.nodeType IN (:nodeTypeNames)')->setParameters([
+            $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.path LIKE :pathPrefix AND n.nodeType IN (:nodeTypeNames)')->setParameters([
                 'pathPrefix' => $this->rootNodePath . '/%',
                 'nodeTypeNames' => $this->affectedNodeTypeNames(),
             ]);
         } else {
-            $query = $this->doctrineEntityManager->createQuery('DELETE FROM ' . NodeData::class . ' n WHERE n.nodeType IN (:nodeTypeNames)')->setParameters([
+            $query = $this->doctrineEntityManager->createQuery('SELECT n FROM ' . NodeData::class . ' n WHERE n.nodeType IN (:nodeTypeNames)')->setParameters([
                 'nodeTypeNames' => $this->affectedNodeTypeNames(),
             ]);
         }
-        $result = $query->execute();
-        if ($result === null) {
-            throw new \RuntimeException('Failed to remove affected nodes', 1558356631);
+        $numberOfRemovedNodes = 0;
+        /** @var NodeData[] $nodeDatasToRemove */
+        $nodeDatasToRemove = $query->getResult();
+        foreach ($nodeDatasToRemove as $nodeData) {
+            $this->removeNodeData($nodeData);
+            $numberOfRemovedNodes ++;
         }
-        $this->doctrineEntityManager->flush();
-        return (int)$result;
+        $this->finalize();
+        return $numberOfRemovedNodes;
     }
 
     public function finalize(): void
@@ -336,6 +331,19 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $this->doctrineEntityManager->flush();
         $this->flushCaches();
         $this->pendingTransactionCount = 0;
+    }
+
+    private function removeNodeData(NodeData $nodeData): void
+    {
+        if ($this->softDelete) {
+            $nodeData->setHidden(true);
+        } else {
+            $nodeData->remove();
+        }
+        $this->registerNodeDataChange($nodeData);
+        if (++$this->pendingTransactionCount % self::MAXIMUM_BATCH_SIZE === 0) {
+            $this->doctrineEntityManager->flush();
+        }
     }
 
     private function registerNodeDataChange(NodeData $nodeData): void
