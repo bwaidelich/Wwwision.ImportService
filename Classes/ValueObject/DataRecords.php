@@ -109,12 +109,12 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
 
     public function map(\Closure $callback): self
     {
-        return new self(array_map($callback, $this->records));
+        return self::fromRecords(array_map($callback, $this->records));
     }
 
     public function filter(\Closure $filter): self
     {
-        return new self(array_filter($this->records, $filter));
+        return self::fromRecords(array_filter($this->records, $filter));
     }
 
     public function jsonSerialize(): array

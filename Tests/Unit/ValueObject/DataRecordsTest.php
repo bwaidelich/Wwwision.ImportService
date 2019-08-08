@@ -2,6 +2,9 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\Tests\Unit\ValueObject;
 
+use Wwwision\ImportService\ValueObject\DataId;
+use Wwwision\ImportService\ValueObject\DataIds;
+use Wwwision\ImportService\ValueObject\DataRecord;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Neos\Flow\Tests\UnitTestCase;
 use PHPUnit\Framework\Assert;
@@ -37,5 +40,19 @@ class DataRecordsTest extends UnitTestCase
     {
         $records = DataRecords::fromRawArray($rows, 'id', null);
         Assert::assertCount($expectedCount, $records);
+    }
+
+    /**
+     * @test
+     */
+    public function mapAllowsChangingRecordIds(): void
+    {
+        $records = DataRecords::fromRawArray([['id' => 'first'], ['id' => 'second']], 'id', null);
+        $recordsWithChangedIds = $records->map(static function(DataRecord $record) {
+            return $record->withId(DataId::fromString($record->id()->toString() . '-changed'));
+        });
+
+        $expectedIds = DataIds::fromStringArray(['first-changed', 'second-changed']);
+        Assert::assertTrue($recordsWithChangedIds->getIds()->diff($expectedIds)->isEmpty());
     }
 }
