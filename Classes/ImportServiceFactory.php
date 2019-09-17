@@ -70,4 +70,12 @@ final class ImportServiceFactory
         }
     }
 
+    /**
+     * @return string[]
+     */
+    public function getPresetNames(): array
+    {
+        return array_keys($this->presets);
+    }
+
 }

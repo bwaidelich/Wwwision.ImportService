@@ -83,6 +83,29 @@ final class ImportCommandController extends CommandController
     }
 
     /**
+     * Lists all configured preset names
+     * @throws StopActionException
+     */
+    public function presetsCommand(): void
+    {
+        $presetNames = $this->importServiceFactory->getPresetNames();
+        if ($presetNames === []) {
+            $this->outputLine('<error>There are no import presets defined</error>');
+            $this->quit();
+            return;
+        }
+        $presetCount = \count($presetNames);
+        if ($presetCount === 1) {
+            $this->outputLine('The following preset is defined:');
+        } else {
+            $this->outputLine('The following <b>%d</b> presets are defined:', [$presetCount]);
+        }
+        foreach ($presetNames as $presetName) {
+            $this->outputLine(' * <b>%s</b>', [$presetName]);
+        }
+    }
+
+    /**
      * @param ImportService $importService
      * @param bool $quiet
      */
