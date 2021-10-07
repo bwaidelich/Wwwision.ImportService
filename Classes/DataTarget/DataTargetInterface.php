@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataTarget;
 
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\Mapper;
 use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
@@ -29,5 +30,7 @@ interface DataTargetInterface
     public function removeAll(): int;
 
     public function finalize(): void;
+
+    public function setup(): Result;
 
 }

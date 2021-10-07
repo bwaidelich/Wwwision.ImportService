@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
@@ -50,6 +51,12 @@ final class ClosureDataSource implements DataSourceInterface
     public static function createWithOptions(array $options): DataSourceInterface
     {
         return new static(static function() { return DataRecords::createEmpty();}, $options);
+    }
+
+    public function setup(): Result
+    {
+        // ClosureDataSource can't be setup
+        return new Result();
     }
 
     /**

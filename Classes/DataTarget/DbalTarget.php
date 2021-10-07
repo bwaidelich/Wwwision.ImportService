@@ -2,6 +2,9 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataTarget;
 
+use Neos\Error\Messages\Error;
+use Neos\Error\Messages\Notice;
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\Mapper;
 use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
@@ -10,7 +13,7 @@ use Wwwision\ImportService\ValueObject\DataIds;
 use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DBALException;
+use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\Driver\Statement;
 use Doctrine\DBAL\DriverManager;
 use Neos\Flow\Annotations as Flow;
@@ -108,6 +111,22 @@ final class DbalTarget implements DataTargetInterface
         $this->dbal = DriverManager::getConnection($backendOptions);
     }
 
+    public function setup(): Result
+    {
+        $result = new Result();
+        try {
+            /** @noinspection NullPointerExceptionInspection */
+            if ($this->dbal->getSchemaManager()->tablesExist([$this->tableName])) {
+                $result->addNotice(new Notice('Target table "%s" exists', null, [$this->tableName]));
+            } else {
+                $result->addError(new Error('Target table "%s" doesn\'t exist', null, [$this->tableName]));
+            }
+        } catch (DBALException $exception) {
+            $result->addError(new Error('Failed to connect to target database: %s', $exception->getCode(), [$exception->getMessage()]));
+        }
+        return $result;
+    }
+
     public function computeDataChanges(DataRecords $records, bool $forceUpdates, bool $skipAddedRecords, bool $skipRemovedRecords): ChangeSet
     {
         $localIds = $this->getLocalIds();
@@ -164,9 +183,9 @@ final class DbalTarget implements DataTargetInterface
     {
         if ($this->localRowsCache === null) {
             if ($this->versionColumn === null) {
-                $this->localRowsCache = $this->dbal->fetchAll(sprintf('SELECT %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->tableName)));
+                $this->localRowsCache = $this->dbal->fetchAllAssociative(sprintf('SELECT %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->tableName)));
             } else {
-                $this->localRowsCache = $this->dbal->fetchAll(sprintf('SELECT %s, %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->versionColumn), $this->dbal->quoteIdentifier($this->tableName)));
+                $this->localRowsCache = $this->dbal->fetchAllAssociative(sprintf('SELECT %s, %s FROM %s', $this->dbal->quoteIdentifier($this->idColumn), $this->dbal->quoteIdentifier($this->versionColumn), $this->dbal->quoteIdentifier($this->tableName)));
             }
         }
         return $this->localRowsCache;

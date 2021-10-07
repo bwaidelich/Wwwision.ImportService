@@ -2,8 +2,11 @@
 namespace Wwwision\ImportService\DataSource;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception as DBALException;
+use Neos\Error\Messages\Error;
+use Neos\Error\Messages\Notice;
+use Neos\Error\Messages\Result;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\Arrays;
 use Wwwision\ImportService\OptionsSchema;
@@ -95,13 +98,29 @@ final class DbalSource implements DataSourceInterface
         $this->dbal = DriverManager::getConnection($backendOptions);
     }
 
+    public function setup(): Result
+    {
+        $result = new Result();
+        try {
+            /** @noinspection NullPointerExceptionInspection */
+            if ($this->dbal->getSchemaManager()->tablesExist([$this->tableName])) {
+                $result->addNotice(new Notice('Source table "%s" exists', null, [$this->tableName]));
+            } else {
+                $result->addError(new Error('Source table "%s" doesn\'t exist', null, [$this->tableName]));
+            }
+        } catch (DBALException $exception) {
+            $result->addError(new Error('Failed to connect to source database: %s', $exception->getCode(), [$exception->getMessage()]));
+        }
+        return $result;
+    }
+
     public function load(): DataRecords
     {
         if ($this->lazyLoading) {
             return $this->loadLazily();
         }
 
-        $rows = $this->dbal->fetchAll('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName));
+        $rows = $this->dbal->fetchAllAssociative('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName));
         return DataRecords::fromRawArray($rows, $this->idColumn, $this->versionColumn);
     }
 
@@ -111,11 +130,11 @@ final class DbalSource implements DataSourceInterface
         if ($this->versionColumn !== null) {
             $columnNames[] = $this->dbal->quoteIdentifier($this->versionColumn);
         }
-        $rows = $this->dbal->fetchAll('SELECT ' . implode(', ', $columnNames) . ' FROM ' . $this->dbal->quoteIdentifier($this->tableName));
+        $rows = $this->dbal->fetchAllAssociative('SELECT ' . implode(', ', $columnNames) . ' FROM ' . $this->dbal->quoteIdentifier($this->tableName));
         return DataRecords::fromRecords(array_map(function(array $row) {
             $id = DataId::fromString($row[$this->idColumn]);
             $closure = function() use ($id) {
-                return $this->dbal->fetchAssoc('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName) . ' WHERE ' . $this->dbal->quoteIdentifier($this->idColumn) . ' = :id', ['id' => $id->toString()]);
+                return $this->dbal->fetchAllAssociative('SELECT * FROM ' . $this->dbal->quoteIdentifier($this->tableName) . ' WHERE ' . $this->dbal->quoteIdentifier($this->idColumn) . ' = :id', ['id' => $id->toString()]);
             };
             if ($this->versionColumn !== null) {
                 $version = DataVersion::parse($row[$this->versionColumn]);

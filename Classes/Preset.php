@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService;
 
+use Neos\Error\Messages\Result;
 use Neos\Utility\TypeHandling;
 use Wwwision\ImportService\DataSource\DataSourceInterface;
 use Wwwision\ImportService\DataTarget\DataTargetInterface;
@@ -145,5 +146,13 @@ final class Preset
     public function finalize(): void
     {
         $this->dataTarget->finalize();
+    }
+
+    public function setup(): Result
+    {
+        $result = new Result();
+        $result->merge($this->dataSource->setup());
+        $result->merge($this->dataTarget->setup());
+        return $result;
     }
 }

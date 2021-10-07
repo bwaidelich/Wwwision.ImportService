@@ -2,6 +2,9 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
+use Neos\Error\Messages\Error;
+use Neos\Error\Messages\Notice;
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
@@ -44,6 +47,17 @@ final class FileSource implements DataSourceInterface
     public static function createWithOptions(array $options): DataSourceInterface
     {
         return new static($options);
+    }
+
+    public function setup(): Result
+    {
+        $result = new Result();
+        if (is_file($this->filePath) && is_readable($this->filePath)) {
+            $result->addNotice(new Notice('Source file "%s" is readable', null, [$this->filePath]));
+        } else {
+            $result->addError(new Error('Source file "%s" is not readable', null, [$this->filePath]));
+        }
+        return $result;
     }
 
     public function load(): DataRecords

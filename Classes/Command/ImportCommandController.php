@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService\Command;
 
+use Neos\Error\Messages\Message;
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\ImportService;
 use Wwwision\ImportService\ImportServiceException;
 use Wwwision\ImportService\ImportServiceFactory;
@@ -107,8 +109,6 @@ final class ImportCommandController extends CommandController
 
     /**
      * Displays configuration for a given preset
-     *
-     * @param string $preset Name of the preset to display
      * @throws StopActionException
      */
     public function presetCommand(string $preset): void
@@ -138,6 +138,26 @@ final class ImportCommandController extends CommandController
             $rows[] = [$attributeName, $mappingValue];
         }
         $this->output->outputTable($rows, ['Source attribute', 'Mapping']);
+    }
+
+    /**
+     * Setup the configured data source and target for the specified preset and/or display status
+     *
+     * @param string $preset Name of the preset to setup
+     */
+    public function setupCommand(string $preset): void
+    {
+        $presetInstance = $this->importServiceFactory->createPreset($preset);
+        $this->renderResult($presetInstance->setup());
+    }
+
+    // ---------------------------------------
+
+    private function renderResult(Result $result): void
+    {
+        array_map(fn (Message $message) => $this->outputLine('<error>%s</error>', [$message->render()]), $result->getErrors());
+        array_map(fn (Message $message) => $this->outputLine('<comment>%s</comment>', [$message->render()]), $result->getWarnings());
+        array_map(fn (Message $message) => $this->outputLine('<success>%s</success>', [$message->render()]), $result->getNotices());
     }
 
     /**

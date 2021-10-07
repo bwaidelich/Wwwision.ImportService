@@ -5,6 +5,9 @@ namespace Wwwision\ImportService\DataSource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Uri;
+use Neos\Error\Messages\Error;
+use Neos\Error\Messages\Notice;
+use Neos\Error\Messages\Result;
 use Wwwision\ImportService\ImportServiceException;
 use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
@@ -60,6 +63,18 @@ final class HttpDataSource implements DataSourceInterface
     public static function createWithOptions(array $options): DataSourceInterface
     {
         return new static($options);
+    }
+
+    public function setup(): Result
+    {
+        $result = new Result();
+        try {
+            $this->httpClient->get($this->endpoint);
+            $result->addNotice(new Notice('Endpoint "%s" can be accessed', null, [$this->endpoint]));
+        } catch (GuzzleException $e) {
+            $result->addError(new Error('Failed to access endpoint "%s": %s', $e->getCode(), [$this->endpoint, $e->getMessage()]));
+        }
+        return $result;
     }
 
     /**
