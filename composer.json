@@ -5,10 +5,11 @@
   "license": "MIT",
   "require": {
     "ext-json": "*",
-    "neos/flow": "^5.2"
+    "neos/flow": "^6.0 || ^7.0",
+    "guzzlehttp/guzzle": "^7.0"
   },
   "require-dev": {
-    "roave/security-advisories": "dev-master"
+    "roave/security-advisories": "dev-latest"
   },
   "autoload": {
     "psr-4": {
