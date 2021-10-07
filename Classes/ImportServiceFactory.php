@@ -51,7 +51,17 @@ final class ImportServiceFactory
         return new ImportService($this->createPreset($presetName)->withDataSource($dataSource));
     }
 
-    private function createPreset(string $presetName): Preset
+    public function createPreset(string $presetName): Preset
+    {
+        $presetConfiguration = $this->getPresetConfiguration($presetName);
+        try {
+            return Preset::fromConfiguration($presetConfiguration);
+        } catch (\Exception $exception) {
+            throw new \RuntimeException(sprintf('Error while loading preset "%s": %s', $presetName, $exception->getMessage()), 1558340308, $exception);
+        }
+    }
+
+    public function getPresetConfiguration(string $presetName): array
     {
         if (!\array_key_exists($presetName, $this->presets)) {
             throw new \InvalidArgumentException(sprintf('Preset "%s" is not configured', $presetName), 1557127480);
@@ -63,11 +73,7 @@ final class ImportServiceFactory
             }
             $presetConfiguration = Arrays::arrayMergeRecursiveOverrule($this->presetTemplates[$presetConfiguration['template']], $presetConfiguration);
         }
-        try {
-            return Preset::fromConfiguration($presetConfiguration);
-        } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Error while loading preset "%s": %s', $presetName, $exception->getMessage()), 1558340308, $exception);
-        }
+        return $presetConfiguration;
     }
 
     /**

@@ -106,6 +106,41 @@ final class ImportCommandController extends CommandController
     }
 
     /**
+     * Displays configuration for a given preset
+     *
+     * @param string $preset Name of the preset to display
+     * @throws StopActionException
+     */
+    public function presetCommand(string $preset): void
+    {
+        $presetConfiguration = $this->importServiceFactory->getPresetConfiguration($preset);
+        $this->outputLine('<b>Source</b>');
+        $rows = [
+            ['className', $presetConfiguration['source']['className']],
+        ];
+        foreach ($presetConfiguration['source']['options'] ?? [] as $optionKey => $optionValue) {
+            $rows[] = [$optionKey, $optionValue];
+        }
+        $this->output->outputTable($rows, ['Option', 'Value']);
+
+        $this->outputLine('<b>Target</b>');
+        $rows = [
+            ['className', $presetConfiguration['target']['className']],
+        ];
+        foreach ($presetConfiguration['target']['options'] ?? [] as $optionKey => $optionValue) {
+            $rows[] = [$optionKey, $optionValue];
+        }
+        $this->output->outputTable($rows, ['Option', 'Value']);
+
+        $this->outputLine('<b>Mapping</b>');
+        $rows = [];
+        foreach ($presetConfiguration['mapping'] ?? [] as $attributeName => $mappingValue) {
+            $rows[] = [$attributeName, $mappingValue];
+        }
+        $this->output->outputTable($rows, ['Source attribute', 'Mapping']);
+    }
+
+    /**
      * @param ImportService $importService
      * @param bool $quiet
      */
