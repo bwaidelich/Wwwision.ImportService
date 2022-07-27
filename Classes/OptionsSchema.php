@@ -101,7 +101,7 @@ final class OptionsSchema
             $expectedType = $optionSchema['type'] ?? 'string';
             $actualType = TypeHandling::getTypeForValue($options[$optionName]);
             if ($expectedType === 'callable') {
-                if (!\is_callable($options[$optionName])) {
+                if (!\is_callable($options[$optionName], true)) {
                     throw new \InvalidArgumentException(sprintf('Option "%s" must be a callable in the format: "Some\ClassName::someMethodName" but it is: "%s" and that is not callable', $optionName, \is_string($options[$optionName]) ? $options[$optionName] : $actualType), 1563962182);
                 }
             } elseif ($actualType !== $expectedType) {
