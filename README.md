@@ -42,6 +42,51 @@ Wwwision:
 ./flow import:import some-prefix:some-name
 ```
 
+## Pre-process data
+
+Sometimes the data has to be processed before it is mapped to. This can be done with a `dataProcessor`.
+
+### Example:
+
+#### Implementation
+
+A processor is any *public* method of any class that can be instantiated by Flow without additional arguments:
+
+```php
+<?php
+declare(strict_types=1);
+namespace Some\Package;
+
+use Wwwision\ImportService\ValueObject\DataRecord;
+use Wwwision\ImportService\ValueObject\DataRecords;
+
+final class SomeProcessor
+{
+
+    public function someMethod(DataRecords $records): DataRecords
+    {
+        return $records->map(static fn (DataRecord $record) => $record->withAttribute('title', 'overridden'));
+    }
+}
+```
+
+*Note:* The processor class _can_ have dependencies, but it should be possible to create a new instance via `ObjectMananger::get($processorClassname)` without further arguments, i.e. the class should behave like a singleton (see https://flowframework.readthedocs.io/en/stable/TheDefinitiveGuide/PartIII/ObjectManagement.html)
+
+#### Configuration
+
+```yaml
+Wwwision:
+  ImportService:
+    presets:
+      '<preset-name>':
+        # ...
+        options:
+          dataProcessor: 'Some\Package\SomeProcessor::someMethod'
+```
+
+*Note:* The syntax looks like the method has to be static, but that's not the case. It just has to satisfy PHPs `is_callable()` function
+
+
 ## Validate configuration
 
 Configuration for this package is verbose and thus error prone.
