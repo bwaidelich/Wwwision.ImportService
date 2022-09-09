@@ -56,6 +56,14 @@ final class Preset
         if (!$dataSource instanceof DataSourceInterface) {
             throw new \RuntimeException(sprintf('The configured "source.className" is not an instance of %s', DataSourceInterface::class), 1557238800);
         }
+        return self::fromConfigurationWithDataSource($configuration, $dataSource);
+    }
+
+    /**
+     * Create a Preset from a given Configuration. Additionally passing extra defined datasource like e.g. ClosureDataSource
+     */
+    public static function fromConfigurationWithDataSource(array $configuration, DataSourceInterface $dataSource): self
+    {
         if (!isset($configuration['mapping'])) {
             throw new \RuntimeException(sprintf('Missing "mapping" configuration'), 1558080904);
         }

@@ -32,6 +32,11 @@ final class ImportServiceFactory
         return new ImportService($this->createPreset($presetName));
     }
 
+    public function createFromPreset(Preset $preset): ImportService
+    {
+        return new ImportService($preset);
+    }
+
     public function createWithFixture(string $presetName): ImportService
     {
         $preset = $this->createPreset($presetName);
