@@ -94,6 +94,11 @@ final class Preset
     {
         return new static($dataSource, $this->dataTarget, $this->options);
     }
+    
+    public function withDataSourceAndTarget(DataSourceInterface $dataSource, DataTargetInterface $dataTarget): self
+    {
+        return new static($dataSource, $dataTarget, $this->options);
+    }
 
     public function isSkipAddedRecords(): bool
     {
