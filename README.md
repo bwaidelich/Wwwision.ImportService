@@ -100,6 +100,16 @@ Which should produce the output
 
 ```bash
 Validating Settings configuration on path Wwwision.ImportService
- 
+
 All Valid!
+```
+
+### Usage without Neos.ContentRepository package
+
+If the Neos.ContentRepository package is not installed Flow's proxy class builder throws an `UnknownObjectException`.
+Disable autowiring in `Objects.yaml`:
+
+```yaml
+Wwwision\ImportService\DataTarget\ContentRepositoryTarget:
+  autowiring: false
 ```
