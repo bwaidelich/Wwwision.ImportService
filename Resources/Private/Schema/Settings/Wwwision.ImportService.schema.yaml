@@ -11,11 +11,11 @@ properties:
         'options':
           type: dictionary
           properties:
-            'skipNewRecords':
+            'skipAddedRecords':
               type: boolean
             'skipRemovedRecords':
               type: boolean
-            'dataPostProcessor':
+            'dataProcessor':
               type: string
               pattern: '/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff\\]*::[a-zA-Z_\x7f-\xff]*$/u'
         'source':
