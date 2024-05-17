@@ -120,7 +120,7 @@ final class Preset
             [$className, $methodName] = explode('::', $this->options['dataProcessor'], 2);
             $records = \call_user_func([new $className(), $methodName], $records);
             if (!$records instanceof DataRecords) {
-                throw new \RuntimeException(sprintf('The "dataPostprocessor" must return an instance of %s but returned a %s', DataRecords::class, TypeHandling::getTypeForValue($records)), 1563978776);
+                throw new \RuntimeException(sprintf('The "dataProcessor" must return an instance of %s but returned a %s', DataRecords::class, TypeHandling::getTypeForValue($records)), 1563978776);
             }
         }
         return $records;
