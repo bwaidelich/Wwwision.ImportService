@@ -103,6 +103,98 @@ Validating Settings configuration on path Wwwision.ImportService
 All Valid!
 ```
 
+## CLI
+
+This package provides the following CLI commands:
+
+### `import:run`
+
+Synchronizes data (add, update,delete) for the given preset.
+
+#### Usage
+
+```shell
+./flow import:run [<options>] <preset>
+```
+
+#### Arguments
+
+```
+  --preset             The preset to use (see Wwwision.Import.presets setting)
+```
+
+#### Options
+
+```
+  --quiet              If set, no output, apart from errors, will be displayed
+  --force-updates      If set, all local records will be updated regardless of their version/timestamp. This is useful for node type changes that require new data to be fetched
+  --from-fixture       If set, the data will be loaded from a local fixture file instead of the configured data source
+```
+
+### `import:prune`
+
+Removes all data for the given preset
+
+#### Usage
+
+```shell
+./flow import:prune [<options>] <preset>
+```
+
+#### Arguments
+
+```
+  --preset             The preset to reset (see Wwwision.Import.presets setting)
+```
+
+#### Options
+
+```
+  --assume-yes         If set, "yes" will be assumed for the confirmation question
+```
+
+### `import:presets`
+
+Lists all configured preset names
+
+#### Usage
+
+```shell
+./flow import:presets
+```
+
+### `import:preset`
+
+Displays configuration for a given preset
+
+#### Usage
+
+```shell
+./flow import:preset <preset>
+```
+
+#### Arguments
+
+```
+  --preset             The preset to show configuration for (see Wwwision.Import.presets setting)
+```
+
+### `import:setup`
+
+Set up the configured data source and target for the specified preset and/or display status
+
+#### Usage
+
+```shell
+./flow import:setup <preset>
+```
+
+#### Arguments
+
+```
+  --preset             Name of the preset to set up
+```
+
 ## Neos ContentRepository import
 
 Importing data from a 3rd party API into the Neos Content Repository is one of the main requirements for this package.
