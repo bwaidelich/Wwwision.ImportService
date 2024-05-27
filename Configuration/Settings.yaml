@@ -3,26 +3,36 @@
 #
 #Wwwision:
 #  ImportService:
-#    presets:
-#      'some:preset':
+#    presetTemplates:
+#      'some:template':
 #        syncOnly: false
 #        source:
-#          className: 'Wwwision\ImportService\DataSource\DbalSource'
+#          factory: 'Wwwision\ImportService\DataSource\Dbal\DbalSourceFactory'
 #          options:
 #            backendOptions:
 #              dbname: 'some-db-name'
 #            table: 'source-table'
-#          fixture:
-#            file: 'resource://some/file'
-#          postProcessor: 'Some\Package::processRecords'
 #        target:
-#          className: 'Wwwision\ImportService\DataTarget\DbalTarget'
+#          factory: 'Wwwision\ImportService\DataTarget\Dbal\DbalTargetFactory'
 #          options:
 #            table: 'target-table'
 #            idColumn: 'slug'
 #            versionColumn: 'version'
+#    presets:
+#      'some:preset':
+#        template: 'some:template'
+#        source:
+#          options:
+#            table: 'changed-source-table'
+#          fixture:
+#            file: 'resource://some/file'
+#          postProcessor: 'Some\Package::processRecords'
 #        mapping:
 #          'slug': 'id'
 #          'givenname': '${String.firstLetterToUpperCase(record.firstName)}'
 #          'familyname': 'lastname'
 #          'version': 'revision'
+Wwwision:
+  ImportService:
+    presetTemplates: []
+    presets: []

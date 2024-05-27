@@ -10,27 +10,20 @@ use Neos\Flow\Annotations as Flow;
 
 /**
  * A facade for the somewhat quirky Neos\Eel\Utility class that allows to detect and evaluate Eel expressions
- *
- * @Flow\Scope("singleton")
  */
+#[Flow\Scope('singleton')]
 final class EelEvaluator
 {
     /**
-     * @Flow\Inject(lazy=false)
      * @var EelEvaluatorInterface
      */
-    protected $eelEvaluator;
+    #[Flow\Inject(lazy: false)]
+    protected EelEvaluatorInterface $eelEvaluator;
 
-    /**
-     * @Flow\InjectConfiguration(package="Neos.Fusion", path="defaultContext")
-     * @var array
-     */
-    protected $eelDefaultContextConfiguration;
+    #[Flow\InjectConfiguration(path: 'defaultContext', package: 'Neos.Fusion')]
+    protected array|null $eelDefaultContextConfiguration = null;
 
-    /**
-     * @var array
-     */
-    private $eelDefaultContextVariables;
+    private array|null $eelDefaultContextVariables = null;
 
     public function isEelExpression(string $expression): bool
     {
@@ -51,6 +44,8 @@ final class EelEvaluator
             return EelUtility::evaluateEelExpression($expression, $this->eelEvaluator, array_merge($this->eelDefaultContextVariables, $variables));
         } catch (Exception $exception) {
             throw new \RuntimeException(sprintf('The following Eel expression could not be evaluated: %s', $expression), 1558096953, $exception);
+        } catch (\Throwable $exception) {
+            throw new \RuntimeException(sprintf('Error while evaluating Eel expression: %s', $expression), 1706890254, $exception);
         }
     }
 

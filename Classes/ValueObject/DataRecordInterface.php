@@ -12,5 +12,5 @@ interface DataRecordInterface extends \ArrayAccess, \JsonSerializable
 
     public function hasAttribute(string $attributeName): bool;
 
-    public function attribute(string $attributeName);
+    public function attribute(string $attributeName): mixed;
 }

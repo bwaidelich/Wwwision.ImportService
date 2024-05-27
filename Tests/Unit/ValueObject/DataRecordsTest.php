@@ -21,7 +21,7 @@ class DataRecordsTest extends UnitTestCase
         Assert::assertCount(0, $records);
     }
 
-    public function countDataProvider(): array
+    public static function countDataProvider(): array
     {
         return [
             ['rows' => [], 'expectedCount' => 0],
@@ -49,7 +49,7 @@ class DataRecordsTest extends UnitTestCase
     {
         $records = DataRecords::fromRawArray([['id' => 'first'], ['id' => 'second']], 'id', null);
         $recordsWithChangedIds = $records->map(static function(DataRecord $record) {
-            return $record->withId(DataId::fromString($record->id()->toString() . '-changed'));
+            return $record->withId(DataId::fromString($record->id()->value . '-changed'));
         });
 
         $expectedIds = DataIds::fromStringArray(['first-changed', 'second-changed']);

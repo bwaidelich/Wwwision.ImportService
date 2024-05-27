@@ -23,11 +23,11 @@ Wwwision:
 
       'some-prefix:some-name':
         source:
-          className: 'Wwwision\ImportService\DataSource\HttpDataSource'
+          factory: 'Wwwision\ImportService\DataSource\Http\HttpSourceFactory'
           options:
             endpoint: 'https://some-endpoint.tld/data.json'
         target:
-          className: 'Wwwision\ImportService\DataTarget\DbalTarget'
+          factory: 'Wwwision\ImportService\DataTarget\Dbal\DbalSourceFactory'
           options:
             table: 'some_table'
         mapping:
@@ -39,7 +39,7 @@ Wwwision:
 ### Run the import
 
 ```bash
-./flow import:import some-prefix:some-name
+./flow import:run some-prefix:some-name
 ```
 
 ## Pre-process data
@@ -86,10 +86,9 @@ Wwwision:
 
 *Note:* The syntax looks like the method has to be static, but that's not the case. It just has to satisfy PHPs `is_callable()` function
 
-
 ## Validate configuration
 
-Configuration for this package is verbose and thus error prone.
+Configuration for this package is verbose and thus error-prone.
 The settings can be validated against a schema via the following command:
 
 ```bash
@@ -104,12 +103,55 @@ Validating Settings configuration on path Wwwision.ImportService
 All Valid!
 ```
 
+## Neos ContentRepository import
+
+Importing data from a 3rd party API into the Neos Content Repository is one of the main requirements for this package.
+
+To import records into the Content Repository, the privided `ContentRepositoryTarget` can be used, it has the following options:
+
+```
+nodeType (string, required): Type of the imported nodes
+rootNodePath: (string, optional): Absolute path of the root node underneath imported nodes will placed
+parentNodeResolver: (callable string, optional): Callback in the format ('<FQCN>::<methodName>') that is invoked to resolve the parent node for a given record. The signature is: \Closure(\Wwwision\ImportService\ValueObject\DataRecord): \Neos\ContentRepository\Domain\Model\Node
+nodeVariantsResolver: (callable string, optional): Callback in the format ('<FQCN>::<methodName>') that is invoked to resolve dimension variants for a given record. The signature is: \Closure(\Wwwision\ImportService\ValueObject\DataRecord): array of dimension values
+idPrefix: (string, optional): Optional prefix that is prepended to the dataRecord IDs in order to get globally unique node identifiers
+softDelete (boolean, optional): If set, removed records lead to the corresponding node to be _disabled_ only. Otherwise they are deleted from the Content Repository
+rootNodeType: (string, optional): Type of the root node, imported nodes are placed in – if set and no root node can be found, the importer tries to create it via ./flow importer:setup
+```
+
+**Note:** Either `rootNodePath` or `parentNodeResolver` have to be specified!
+
+### Example configuration:
+
+```yaml
+Wwwision:
+  ImportService:
+    presets:
+
+      'some:preset':
+        source:
+          # depending on the data source, see above
+        target:
+          factory: 'Wwwision\ImportService\DataTarget\ContentRepository\ContentRepositoryTargetFactory'
+          options:
+            nodeType: 'Some.Package:Type.Of.Imported.Nodes'
+            rootNodePath: '/sites/some-site/some/path'
+            # alternatively:
+            # parentNodeResolver: Some`\Package\SomeSingleton::someMethod
+            idPrefix: 'product-'
+            softDelete: true
+        mapping:
+          'title': 'title' # just use the record title 1:1
+          'price': '${record.priceNet + record.vat}' # arbitrary Eel expressions are supported
+          'uriPathSegment': '${Some.Custom.Eelhelper(record.title + "-" + record.id)}' # ...including custom Eel helpers (registered via Neos.Fusion.defaultContext setting)
+```
+
 ### Usage without Neos.ContentRepository package
 
 If the Neos.ContentRepository package is not installed Flow's proxy class builder throws an `UnknownObjectException`.
-Disable autowiring in `Objects.yaml`:
+Disable auto-wiring in `Objects.yaml`:
 
-```yaml
+  ```yaml
 Wwwision\ImportService\DataTarget\ContentRepositoryTarget:
   autowiring: false
 ```

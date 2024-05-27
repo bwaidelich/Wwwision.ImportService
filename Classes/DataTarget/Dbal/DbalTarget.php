@@ -1,125 +1,61 @@
 <?php
 declare(strict_types=1);
-namespace Wwwision\ImportService\DataTarget;
+namespace Wwwision\ImportService\DataTarget\Dbal;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\Statement;
+use Doctrine\DBAL\Exception as DBALException;
 use Neos\Error\Messages\Error;
 use Neos\Error\Messages\Notice;
 use Neos\Error\Messages\Result;
+use Neos\Flow\Annotations as Flow;
+use Wwwision\ImportService\DataTarget\DataTargetInterface;
 use Wwwision\ImportService\Mapper;
-use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
 use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
-use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Exception as DBALException;
-use Doctrine\DBAL\Driver\Statement;
-use Doctrine\DBAL\DriverManager;
-use Neos\Flow\Annotations as Flow;
-use Neos\Utility\Arrays;
 use Wwwision\ImportService\ValueObject\DataVersion;
 
 /**
  * DBAL Data Target that allows to import records into a database table
  */
+#[Flow\Proxy(false)]
 final class DbalTarget implements DataTargetInterface
 {
 
     /**
-     * @var array
+     * @var array|null
      */
-    private $customBackendOptions;
+    private array|null $localRowsCache = null;
 
     /**
-     * @Flow\InjectConfiguration(package="Neos.Flow", path="persistence.backendOptions")
-     * @var array
+     * @var array<string, mixed>|null
      */
-    protected $flowBackendOptions;
+    private array|null $localVersionsCache = null;
 
-    /**
-     * @var Mapper
-     */
-    private $mapper;
-
-    /**
-     * @var Connection
-     */
-    private $dbal;
-
-    /**
-     * @var string
-     */
-    private $tableName;
-
-    /**
-     * @var string
-     */
-    private $idColumn;
-
-    /**
-     * @var string|null
-     */
-    private $versionColumn;
-
-    /**
-     * @var array
-     */
-    private $localRowsCache;
-
-    /**
-     * @var array
-     */
-    private $localVersionsCache;
-
-    protected function __construct(Mapper $mapper, array $options)
-    {
-        $this->mapper = $mapper;
-        $this->tableName = $options['table'];
-        $this->idColumn = $options['idColumn'] ?? 'id';
-        $this->versionColumn = $options['versionColumn'] ?? null;
-        $this->customBackendOptions = $options['customBackendOptions'] ?? null;
-    }
-
-    public static function getOptionsSchema(): OptionsSchema
-    {
-        return OptionsSchema::create()
-            ->requires('table', 'string')
-            ->has('idColumn', 'string')
-            ->has('versionColumn', 'string')
-            ->has('backendOptions', 'array');
-    }
-
-    public static function createWithMapperAndOptions(Mapper $mapper, array $options): DataTargetInterface
-    {
-        return new static($mapper, $options);
-    }
-
-    /**
-     * @throws DBALException
-     */
-    public function initializeObject(): void
-    {
-        if ($this->customBackendOptions === null) {
-            $this->dbal = DriverManager::getConnection($this->flowBackendOptions);
-            return;
-        }
-        if (!\is_array($this->customBackendOptions)) {
-            throw new \RuntimeException(sprintf('Option "backendOptions" must resolve to an array, given: %s', \is_object($this->customBackendOptions) ? \get_class($this->customBackendOptions) : \gettype($this->customBackendOptions)), 1563881291);
-        }
-        $backendOptions = Arrays::arrayMergeRecursiveOverrule($this->flowBackendOptions, $this->customBackendOptions);
-        $this->dbal = DriverManager::getConnection($backendOptions);
+    public function __construct(
+        private readonly Mapper $mapper,
+        private readonly Connection $dbal,
+        private readonly string $tableName,
+        private readonly string $idColumn,
+        private readonly string|null $versionColumn,
+    ) {
     }
 
     public function setup(): Result
     {
         $result = new Result();
+        if ($this->dbal->getSchemaManager() === null) {
+            $result->addError(new Error('Failed to retrieve DBAL schema manager'));
+            return $result;
+        }
         try {
-            /** @noinspection NullPointerExceptionInspection */
             if ($this->dbal->getSchemaManager()->tablesExist([$this->tableName])) {
                 $result->addNotice(new Notice('Target table "%s" exists', null, [$this->tableName]));
             } else {
-                $result->addError(new Error('Target table "%s" doesn\'t exist', null, [$this->tableName]));
+                $result->addError(new Error('Target table "%s" does not exist', null, [$this->tableName]));
             }
         } catch (DBALException $exception) {
             $result->addError(new Error('Failed to connect to target database: %s', $exception->getCode(), [$exception->getMessage()]));
@@ -161,10 +97,10 @@ final class DbalTarget implements DataTargetInterface
         if ($this->localVersionsCache === null) {
             $this->localVersionsCache = array_column($this->localRows(), $this->versionColumn, $this->idColumn);
         }
-        if (!isset($this->localVersionsCache[$dataId->toString()])) {
+        if (!isset($this->localVersionsCache[$dataId->value])) {
             return DataVersion::none();
         }
-        return DataVersion::parse($this->localVersionsCache[$dataId->toString()]);
+        return DataVersion::parse($this->localVersionsCache[$dataId->value]);
     }
 
     public function isRecordUpdated(DataRecordInterface $record): bool
@@ -206,7 +142,7 @@ final class DbalTarget implements DataTargetInterface
      */
     public function updateRecord(DataRecordInterface $record): void
     {
-        $this->dbal->update($this->tableName, $this->mapper->mapRecord($record, []), [$this->idColumn => $record->id()->toString()]);
+        $this->dbal->update($this->tableName, $this->mapper->mapRecord($record, []), [$this->idColumn => $record->id()->value]);
     }
 
     /**
@@ -215,7 +151,7 @@ final class DbalTarget implements DataTargetInterface
      */
     public function removeRecord(DataId $dataId): void
     {
-        $this->dbal->delete($this->tableName, [$this->idColumn => $dataId->toString()]);
+        $this->dbal->delete($this->tableName, [$this->idColumn => $dataId->value]);
     }
 
     /**

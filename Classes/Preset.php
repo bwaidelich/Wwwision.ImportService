@@ -2,7 +2,6 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService;
 
-use Neos\Error\Messages\Result;
 use Neos\Utility\TypeHandling;
 use Wwwision\ImportService\DataSource\DataSourceInterface;
 use Wwwision\ImportService\DataTarget\DataTargetInterface;
@@ -12,90 +11,16 @@ use Wwwision\ImportService\ValueObject\DataRecordInterface;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
 /**
- * The representation of a Import Service preset
+ * The representation of an Import Service preset
  */
 final class Preset
 {
 
-    /**
-     * @var DataSourceInterface
-     */
-    private $dataSource;
-
-    /**
-     * @var DataTargetInterface
-     */
-    private $dataTarget;
-
-    /**
-     * @var array
-     */
-    private $options;
-
-    protected function __construct(DataSourceInterface $dataSource, DataTargetInterface $dataTarget, array $options)
-    {
-        $this->dataSource = $dataSource;
-        $this->dataTarget = $dataTarget;
-        $this->options = $options;
-    }
-
-    public static function fromConfiguration(array $configuration): self
-    {
-        if (!isset($configuration['source']['className'])) {
-            throw new \RuntimeException('Missing "source.className" configuration', 1557238721);
-        }
-        /** @var DataSourceInterface $dataSourceClassName */
-        $dataSourceClassName = $configuration['source']['className'];
-        $dataSourceOptions = $configuration['source']['options'] ?? [];
-        try {
-            $dataSourceClassName::getOptionsSchema()->validate($dataSourceOptions);
-            $dataSource = $dataSourceClassName::createWithOptions($dataSourceOptions);
-        } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Exception while instantiating data source (%s): %s', $configuration['source']['className'], $exception->getMessage()), 1557999968, $exception);
-        }
-        if (!$dataSource instanceof DataSourceInterface) {
-            throw new \RuntimeException(sprintf('The configured "source.className" is not an instance of %s', DataSourceInterface::class), 1557238800);
-        }
-        return self::fromConfigurationWithDataSource($configuration, $dataSource);
-    }
-
-    /**
-     * Create a Preset from a given Configuration. Additionally passing extra defined datasource like e.g. ClosureDataSource
-     */
-    public static function fromConfigurationWithDataSource(array $configuration, DataSourceInterface $dataSource): self
-    {
-        if (!isset($configuration['mapping'])) {
-            throw new \RuntimeException(sprintf('Missing "mapping" configuration'), 1558080904);
-        }
-        try {
-            $mapper = Mapper::fromArray($configuration['mapping']);
-        } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Exception while instantiating Mapper: %s', $exception->getMessage()), 1558096738, $exception);
-        }
-
-        if (!isset($configuration['target']['className'])) {
-            throw new \RuntimeException('Missing "target.className" configuration', 1557238852);
-        }
-        /** @var DataTargetInterface $dataTargetClassName */
-        $dataTargetClassName = $configuration['target']['className'];
-        $dataTargetOptions = $configuration['target']['options'] ?? [];
-        try {
-            $dataTargetClassName::getOptionsSchema()->validate($dataTargetOptions);
-            $dataTarget = $dataTargetClassName::createWithMapperAndOptions($mapper, $dataTargetOptions);
-        } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Exception while instantiating data target (%s): %s', $configuration['target']['className'], $exception->getMessage()), 1558000004, $exception);
-        }
-        if (!$dataTarget instanceof DataTargetInterface) {
-            throw new \RuntimeException(sprintf('The configured "target.className" is not an instance of %s', DataTargetInterface::class), 1557238877);
-        }
-
-        $presetOptions = $configuration['options'] ?? [];
-        OptionsSchema::create()
-            ->has('skipAddedRecords', 'boolean')
-            ->has('skipRemovedRecords', 'boolean')
-            ->has('dataProcessor', 'callable')
-            ->validate($presetOptions);
-        return new static($dataSource, $dataTarget, $presetOptions);
+    public function __construct(
+        public readonly DataSourceInterface $dataSource,
+        public readonly DataTargetInterface $dataTarget,
+        private readonly array $options
+    ) {
     }
 
     public function withDataSource(DataSourceInterface $dataSource): self
@@ -154,13 +79,5 @@ final class Preset
     public function finalize(): void
     {
         $this->dataTarget->finalize();
-    }
-
-    public function setup(): Result
-    {
-        $result = new Result();
-        $result->merge($this->dataSource->setup());
-        $result->merge($this->dataTarget->setup());
-        return $result;
     }
 }

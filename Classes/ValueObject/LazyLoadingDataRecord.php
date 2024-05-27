@@ -4,41 +4,21 @@ namespace Wwwision\ImportService\ValueObject;
 
 use Neos\Flow\Annotations as Flow;
 
-/**
- * @Flow\Proxy(false)
- */
+#[Flow\Proxy(false)]
 final class LazyLoadingDataRecord implements DataRecordInterface
 {
-    /**
-     * @var DataId
-     */
-    private $id;
+    private bool $isLoaded = false;
 
     /**
-     * @var DataVersion|null
+     * @var array<string, mixed>|null
      */
-    private $version;
+    private array|null $attributes = null;
 
-    /**
-     * @var \Closure|null
-     */
-    private $lazyLoadingCallback;
-
-    /**
-     * @var bool
-     */
-    private $isLoaded = false;
-
-    /**
-     * @var array
-     */
-    private $attributes;
-
-    private function __construct(DataId $id, \Closure $lazyLoadingCallback, DataVersion $version)
-    {
-        $this->id = $id;
-        $this->lazyLoadingCallback = $lazyLoadingCallback;
-        $this->version = $version;
+    private function __construct(
+        public readonly DataId $id,
+        public readonly \Closure $lazyLoadingCallback,
+        public readonly DataVersion $version
+    ) {
     }
 
     public static function fromIdAndClosure(DataId $id, \Closure $lazyLoadingCallback): self
@@ -82,7 +62,7 @@ final class LazyLoadingDataRecord implements DataRecordInterface
         return \array_key_exists($attributeName, $this->attributes);
     }
 
-    public function attribute(string $attributeName)
+    public function attribute(string $attributeName): mixed
     {
         if (!$this->hasAttribute($attributeName)) {
             throw new \InvalidArgumentException(sprintf('attribute "%s" is not set!', $attributeName), 1558005761);

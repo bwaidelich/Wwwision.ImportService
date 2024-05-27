@@ -2,7 +2,6 @@
 declare(strict_types=1);
 namespace Wwwision\ImportService;
 
-use Neos\Flow\Annotations as Flow;
 use Wwwision\ImportService\ValueObject\DataRecordInterface;
 
 /**
@@ -10,30 +9,16 @@ use Wwwision\ImportService\ValueObject\DataRecordInterface;
  */
 final class Mapper
 {
-    /**
-     * @Flow\Inject
-     * @var EelEvaluator
-     */
-    protected $eel;
 
-    /**
-     * @var array
-     */
-    private $mapping;
-
-    protected function __construct(array $mapping)
-    {
+    public function __construct(
+        private readonly EelEvaluator $eelEvaluator,
+        private readonly array $mapping
+    ) {
         foreach ($mapping as $name => $rule) {
             if (!\is_string($rule)) {
-                throw new \InvalidArgumentException(sprintf('Mapping rules have to be strings, got %s for mapping "%s"', \is_object($rule) ? \get_class($rule) : \gettype($rule), $name), 1558096675);
+                throw new \InvalidArgumentException(sprintf('Mapping rules have to be strings, got %s for mapping "%s"', \get_debug_type($rule), $name), 1558096675);
             }
         }
-        $this->mapping = $mapping;
-    }
-
-    public static function fromArray(array $mapping): self
-    {
-        return new static($mapping);
     }
 
     public function mapRecord(DataRecordInterface $record, array $additionalVariables): array
@@ -51,12 +36,16 @@ final class Mapper
             throw new \RuntimeException(sprintf('Missing mapping configuration for column "%s"', $columnName), 1558010499);
         }
         $attributeMapping = $this->mapping[$columnName];
-        if (!$this->eel->isEelExpression($attributeMapping)) {
+        if (!$this->eelEvaluator->isEelExpression($attributeMapping)) {
             return $record->hasAttribute($attributeMapping) ? $record->attribute($attributeMapping) : null;
         }
         $variables = $additionalVariables;
         $variables['record'] = $record;
-        return $this->eel->evaluate($attributeMapping, $variables);
+        try {
+            return $this->eelEvaluator->evaluate($attributeMapping, $variables);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException(sprintf('Failed to map column "%s": %s', $columnName, $e->getMessage()), 1706890124, $e);
+        }
     }
 
 }

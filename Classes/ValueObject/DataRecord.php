@@ -4,31 +4,15 @@ namespace Wwwision\ImportService\ValueObject;
 
 use Neos\Flow\Annotations as Flow;
 
-/**
- * @Flow\Proxy(false)
- */
+#[Flow\Proxy(false)]
 final class DataRecord implements DataRecordInterface
 {
-    /**
-     * @var DataId
-     */
-    private $id;
 
-    /**
-     * @var DataVersion
-     */
-    private $version;
-
-    /**
-     * @var array
-     */
-    private $attributes;
-
-    private function __construct(DataId $id, array $attributes, DataVersion $version)
-    {
-        $this->id = $id;
-        $this->attributes = $attributes;
-        $this->version = $version;
+    private function __construct(
+        public readonly DataId $id,
+        public readonly array $attributes,
+        public readonly DataVersion $version
+    ) {
     }
 
     public static function fromIdAndAttributes(DataId $id, array $attributes): self
@@ -73,7 +57,7 @@ final class DataRecord implements DataRecordInterface
         return \array_key_exists($attributeName, $this->attributes);
     }
 
-    public function attribute(string $attributeName)
+    public function attribute(string $attributeName): mixed
     {
         if (!$this->hasAttribute($attributeName)) {
             throw new \InvalidArgumentException(sprintf('attribute "%s" is not set!', $attributeName), 1558005761);
@@ -86,7 +70,7 @@ final class DataRecord implements DataRecordInterface
         return $this->hasAttribute($attributeName);
     }
 
-    public function offsetGet($attributeName)
+    public function offsetGet($attributeName): mixed
     {
         return $this->attribute($attributeName);
     }

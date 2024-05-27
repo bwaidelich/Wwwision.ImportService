@@ -3,7 +3,6 @@ declare(strict_types=1);
 namespace Wwwision\ImportService\DataSource;
 
 use Neos\Error\Messages\Result;
-use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
 /**
@@ -11,10 +10,6 @@ use Wwwision\ImportService\ValueObject\DataRecords;
  */
 interface DataSourceInterface
 {
-
-    public static function createWithOptions(array $options): self;
-
-    public static function getOptionsSchema(): OptionsSchema;
 
     public function load(): DataRecords;
 

@@ -4,6 +4,7 @@
   "description": "Generic service for importing data from different sources to configurable targets such as the Neos Content Repository or an arbitrary database table",
   "license": "MIT",
   "require": {
+    "php": "^8.1",
     "ext-json": "*",
     "neos/flow": "^6.0 || ^7.0 || ^8.0",
     "guzzlehttp/guzzle": "^7.0"

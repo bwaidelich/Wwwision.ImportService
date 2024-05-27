@@ -1,35 +1,31 @@
 <?php
 declare(strict_types=1);
-namespace Wwwision\ImportService;
+namespace Wwwision\ImportService\Factory;
 
 use Wwwision\ImportService\DataSource\DataSourceInterface;
-use Wwwision\ImportService\DataSource\FileSource;
+use Wwwision\ImportService\DataSource\File\FileSource;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\Arrays;
+use Wwwision\ImportService\ImportService;
+use Wwwision\ImportService\Preset;
 
 /**
  * Factory for the ImportService
- *
- * @Flow\Scope("singleton")
  */
+#[Flow\Scope('singleton')]
 final class ImportServiceFactory
 {
 
-    /**
-     * @Flow\InjectConfiguration(path="presetTemplates")
-     * @var array
-     */
-    protected $presetTemplates;
-
-    /**
-     * @Flow\InjectConfiguration(path="presets")
-     * @var array
-     */
-    protected $presets;
+    public function __construct(
+        private readonly array $presets,
+        private readonly array $presetTemplates,
+        private readonly PresetFactory $presetFactory,
+    ) {
+    }
 
     public function create(string $presetName): ImportService
     {
-        return new ImportService($this->createPreset($presetName));
+        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName)));
     }
 
     public function createFromPreset(Preset $preset): ImportService
@@ -39,31 +35,21 @@ final class ImportServiceFactory
 
     public function createWithFixture(string $presetName): ImportService
     {
-        $preset = $this->createPreset($presetName);
+        $preset = $this->presetFactory->create($this->getPresetConfiguration($presetName));
         if (!isset($this->presets[$presetName]['source']['fixture']['file'])) {
             throw new \RuntimeException(sprintf('Missing "source.fixture.file" configuration for preset "%s"', $presetName), 1558433554);
         }
-        $fixtureOptions = [
-            'filePath' => $this->presets[$presetName]['source']['fixture']['file'],
-            'idAttributeName' => $this->presets[$presetName]['source']['fixture']['idAttributeName'] ?? 'id',
-        ];
-        $fixtureSource = FileSource::createWithOptions($fixtureOptions);
+        $fixtureSource = new FileSource(
+            filePath: $this->presets[$presetName]['source']['fixture']['file'],
+            idAttributeName: $this->presets[$presetName]['source']['fixture']['idAttributeName'] ?? 'id',
+            versionAttributeName: $this->presets[$presetName]['source']['fixture']['versionAttributeName'] ?? null
+        );
         return new ImportService($preset->withDataSource($fixtureSource));
     }
 
     public function createWithDataSource(string $presetName, DataSourceInterface $dataSource): ImportService
     {
-        return new ImportService($this->createPreset($presetName)->withDataSource($dataSource));
-    }
-
-    public function createPreset(string $presetName): Preset
-    {
-        $presetConfiguration = $this->getPresetConfiguration($presetName);
-        try {
-            return Preset::fromConfiguration($presetConfiguration);
-        } catch (\Exception $exception) {
-            throw new \RuntimeException(sprintf('Error while loading preset "%s": %s', $presetName, $exception->getMessage()), 1558340308, $exception);
-        }
+        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName))->withDataSource($dataSource));
     }
 
     public function getPresetConfiguration(string $presetName): array
@@ -86,7 +72,7 @@ final class ImportServiceFactory
      */
     public function getPresetNames(): array
     {
-        return array_keys($this->presets);
+        return array_keys($this->presets ?? []);
     }
 
 }

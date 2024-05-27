@@ -23,7 +23,7 @@ properties:
           type: dictionary
           additionalProperties: false
           properties:
-            'className':
+            'factory':
               type: string
               format: class-name
             'fixture':
@@ -42,7 +42,7 @@ properties:
           type: dictionary
           additionalProperties: false
           properties:
-            'className':
+            'factory':
               type: string
               format: class-name
             options:

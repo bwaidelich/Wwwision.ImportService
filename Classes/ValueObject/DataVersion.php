@@ -4,9 +4,7 @@ namespace Wwwision\ImportService\ValueObject;
 
 use Neos\Flow\Annotations as Flow;
 
-/**
- * @Flow\Proxy(false)
- */
+#[Flow\Proxy(false)]
 final class DataVersion
 {
     /**
@@ -14,28 +12,21 @@ final class DataVersion
      */
     private const NONE = -1;
 
-    /**
-     * @var int
-     */
-    private $value;
-
-    private function __construct(int $value)
-    {
-        if ($value < 0) {
-            throw new \InvalidArgumentException(sprintf('version must not be less than 0, given: %d', $value), 1560596325);
-        }
-        $this->value = $value;
+    private function __construct(
+        public readonly int $value
+    ) {
     }
 
     public static function none(): self
     {
-        $instance = new self(0);
-        $instance->value = self::NONE;
-        return $instance;
+        return new self(self::NONE);
     }
 
     public static function fromNumber(int $value): self
     {
+        if ($value < 0) {
+            throw new \InvalidArgumentException(sprintf('version must not be less than 0, given: %d', $value), 1560596325);
+        }
         return new self($value);
     }
 
@@ -67,7 +58,7 @@ final class DataVersion
             return self::fromDateTime($value);
         }
         if (is_numeric($value)) {
-            return new self((int)$value);
+            return self::fromNumber((int)$value);
         }
         if (\is_string($value)) {
             return self::fromDateString($value, null);
@@ -76,11 +67,6 @@ final class DataVersion
             throw new \InvalidArgumentException(sprintf('Could not parse object of type %s as DataVersion', \get_class($value)), 1560523738);
         }
         throw new \InvalidArgumentException(sprintf('Could not parse %s "%s" as DataVersion', \gettype($value), $value), 1560526428);
-    }
-
-    public function toNumber(): int
-    {
-        return $this->value;
     }
 
     public function isHigherThan(DataVersion $otherVersion): bool
@@ -92,11 +78,5 @@ final class DataVersion
     {
         return $this->value === self::NONE;
     }
-
-    public function __toString(): string
-    {
-        return (string)$this->value;
-    }
-
 
 }

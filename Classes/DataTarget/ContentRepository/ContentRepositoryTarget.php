@@ -1,11 +1,10 @@
 <?php
 declare(strict_types=1);
-namespace Wwwision\ImportService\DataTarget;
+namespace Wwwision\ImportService\DataTarget\ContentRepository;
 
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\Query;
 use Neos\ContentRepository\Domain\Model\NodeData;
 use Neos\ContentRepository\Domain\Model\NodeInterface;
 use Neos\ContentRepository\Domain\Model\NodeTemplate;
@@ -23,8 +22,8 @@ use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Core\Cache\ContentCache;
 use Neos\Utility\ObjectAccess;
 use Neos\Utility\TypeHandling;
+use Wwwision\ImportService\DataTarget\DataTargetInterface;
 use Wwwision\ImportService\Mapper;
-use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataId;
 use Wwwision\ImportService\ValueObject\DataIds;
@@ -37,6 +36,7 @@ use Wwwision\ImportService\ValueObject\DataVersion;
  *
  * Note: This Data Target requires the Neos.ContentRepository package to be installed
  */
+#[Flow\Proxy(false)]
 final class ContentRepositoryTarget implements DataTargetInterface
 {
     /**
@@ -44,151 +44,41 @@ final class ContentRepositoryTarget implements DataTargetInterface
      */
     private const MAXIMUM_BATCH_SIZE = 1000;
 
-    /**
-     * @Flow\Inject
-     * @var EntityManagerInterface
-     */
-    protected $doctrineEntityManager;
+    private NodeType|null $cachedNodeType = null;
 
     /**
-     * @Flow\Inject
-     * @var ContextFactoryInterface
+     * @var array<string, NodeData>
      */
-    protected $contextFactory;
+    private array $cachedNodesByPath = [];
 
     /**
-     * @var NodeTypeManager
+     * @var array<string, array<NodeData>>
      */
-    private $nodeTypeManager;
+    private array $cachedNodesById = [];
 
     /**
-     * @var ContentCache
+     * @var array<string, true>
      */
-    private $contentCache;
+    private array $cacheTagsToFlush = [];
 
-    /**
-     * @var Mapper
-     */
-    private $mapper;
+    private int $pendingTransactionCount = 0;
 
-    /**
-     * @var string
-     */
-    private $nodeTypeName;
-
-    /**
-     * @var string|null
-     */
-    private $rootNodePath;
-
-    /**
-     * @var string|null
-     */
-    private $rootNodeTypeName;
-
-    /**
-     * @var callable|null
-     */
-    private $parentNodeResolver;
-
-    /**
-     * @var string|null
-     */
-    private $idPrefix;
-
-    /**
-     * @var callable|null
-     */
-    private $nodeVariantsResolver;
-
-    /**
-     * @var bool
-     */
-    private $softDelete;
-
-    /**
-     * @var NodeType|null
-     */
-    private $cachedNodeType;
-
-    /**
-     * @var NodeData[]
-     */
-    private $cachedNodesByPath = [];
-
-    /**
-     * @var NodeData[][]
-     */
-    private $cachedNodesById = [];
-
-    /**
-     * @var array
-     */
-    private $cacheTagsToFlush = [];
-
-    /**
-     * @var int
-     */
-    private $pendingTransactionCount = 0;
-
-    protected function __construct(Mapper $mapper, array $options)
-    {
-        $this->requireContentRepositoryPackage();
-        $this->mapper = $mapper;
-
-        $this->nodeTypeName = $options['nodeType'];
-        if (isset($options['rootNodePath'])) {
-            $this->rootNodePath = rtrim($options['rootNodePath'], '\/');
-        } elseif (isset($options['parentNodeResolver'])) {
-            [$className, $methodName] = explode('::', $options['parentNodeResolver'], 2);
-            $this->parentNodeResolver = [new $className(), $methodName];
-        } else {
+    public function __construct(
+        private readonly Mapper $mapper,
+        private readonly NodeTypeManager $nodeTypeManager,
+        private readonly ContentCache $contentCache,
+        private readonly EntityManagerInterface $doctrineEntityManager,
+        private readonly ContextFactoryInterface $contextFactory,
+        private readonly string $nodeTypeName,
+        private readonly string|null $rootNodePath,
+        private readonly \Closure|null $parentNodeResolver,
+        private readonly string|null $rootNodeTypeName,
+        private readonly string|null $idPrefix,
+        private readonly bool $softDelete,
+        private readonly \Closure|null $nodeVariantsResolver,
+    ) {
+        if ($rootNodePath === null && $parentNodeResolver === null) {
             throw new \InvalidArgumentException('Missing option "rootNodePath" and/or "parentNodeDataResolver"', 1558016570);
-        }
-        if (isset($options['rootNodeType'])) {
-            $this->rootNodeTypeName = $options['rootNodeType'];
-        }
-        $this->idPrefix = $options['idPrefix'] ?? null;
-        $this->softDelete = $options['softDelete'] ?? false;
-        if (isset($options['nodeVariantsResolver'])) {
-            [$className, $methodName] = explode('::', $options['nodeVariantsResolver'], 2);
-            $this->nodeVariantsResolver = [new $className(), $methodName];
-        }
-    }
-
-    public function injectNodeTypeManager(NodeTypeManager $nodeTypeManager): void
-    {
-        $this->nodeTypeManager = $nodeTypeManager;
-    }
-
-    public function injectContentCache(ContentCache $contentCache): void
-    {
-        $this->contentCache = $contentCache;
-    }
-
-    public static function getOptionsSchema(): OptionsSchema
-    {
-        return OptionsSchema::create()
-            ->requires('nodeType', 'string')
-            ->has('rootNodePath', 'string')
-            ->has('rootNodeType', 'string')
-            ->has('parentNodeResolver', 'callable')
-            ->has('idPrefix', 'string')
-            ->has('nodeVariantsResolver', 'callable')
-            ->has('softDelete', 'boolean');
-    }
-
-    public static function createWithMapperAndOptions(Mapper $mapper, array $options): DataTargetInterface
-    {
-        return new static($mapper, $options);
-    }
-
-    private function requireContentRepositoryPackage(): void
-    {
-        /** @noinspection ClassConstantCanBeUsedInspection */
-        $className = 'Neos\\ContentRepository\\Domain\\Model\\NodeData';
-        if (!class_exists($className)) {
-            throw new \RuntimeException('This data target requires the Neos.ContentRepository package to be installed!', 1558011349);
         }
     }
 
@@ -200,9 +90,9 @@ final class ContentRepositoryTarget implements DataTargetInterface
             'nodeTypeNames' => $this->affectedNodeTypeNames(),
         ]);
         /** @var array $nodeDataRecords */
-        $nodeDataRecords = $query->execute([], Query::HYDRATE_ARRAY);
+        $nodeDataRecords = $query->execute([], AbstractQuery::HYDRATE_ARRAY);
 
-        // this filters hidden nodes. Otherwise they would end up in $dataToRemove every time
+        // this filters hidden nodes. Otherwise, they would end up in $dataToRemove every time
         $allIds = [];
         $activeIds = [];
         foreach ($nodeDataRecords as $nodeData) {
@@ -221,10 +111,10 @@ final class ContentRepositoryTarget implements DataTargetInterface
             if ($record->version()->isNotSet()) {
                 return true;
             }
-            if (!\array_key_exists($record->id()->toString(), $localDataLastModificationDates)) {
+            if (!\array_key_exists($record->id()->value, $localDataLastModificationDates)) {
                 return true;
             }
-            $localVersion = DataVersion::fromDateTime($localDataLastModificationDates[$record->id()->toString()]);
+            $localVersion = DataVersion::fromDateTime($localDataLastModificationDates[$record->id()->value]);
             return $record->version()->isHigherThan($localVersion);
         };
 
@@ -243,7 +133,6 @@ final class ContentRepositoryTarget implements DataTargetInterface
         }
         return ChangeSet::fromAddedUpdatedAndRemoved($addedRecords, $updatedRecords, $removedDataIds);
     }
-
 
     private function nodeType(): NodeType
     {
@@ -274,7 +163,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         if ($this->parentNodeResolver !== null) {
             $parentNode = \call_user_func($this->parentNodeResolver, $record);
             if (!$parentNode instanceof NodeInterface) {
-                throw new \RuntimeException(sprintf('The "parentNodeResolver" must return an instance of %s, got: %s for record "%s"', NodeInterface::class, TypeHandling::getTypeForValue($parentNode), $record->id()), 1563977620);
+                throw new \RuntimeException(sprintf('The "parentNodeResolver" must return an instance of %s, got: %s for record "%s"', NodeInterface::class, TypeHandling::getTypeForValue($parentNode), $record->id()->value), 1563977620);
             }
             $parentNodeData = $parentNode->getNodeData();
         } else {
@@ -284,10 +173,10 @@ final class ContentRepositoryTarget implements DataTargetInterface
         if ($this->nodeVariantsResolver !== null) {
             $nodeVariants = \call_user_func($this->nodeVariantsResolver, $record);
             if (!\is_array($nodeVariants)) {
-                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" must return an array, got: %s for record "%s"', TypeHandling::getTypeForValue($nodeVariants), $record->id()), 1563977893);
+                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" must return an array, got: %s for record "%s"', TypeHandling::getTypeForValue($nodeVariants), $record->id()->value), 1563977893);
             }
             if ($nodeVariants === []) {
-                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" returned an empty array for record "%s"', $record->id()), 1563977956);
+                throw new \RuntimeException(sprintf('The "nodeVariantsResolver" returned an empty array for record "%s"', $record->id()->value), 1563977956);
             }
         } else {
             $nodeVariants = [$parentNodeData->getDimensionValues()];
@@ -404,10 +293,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     private function mapNodeData(NodeData $nodeData, DataRecordInterface $record): void
     {
-        $mappedValues = array_filter($this->mapper->mapRecord($record, ['nodeData' => $nodeData]), static function ($value) {
-            return $value !== null;
-        });
-        foreach ($mappedValues as $propertyName => $propertyValue) {
+        foreach ($this->mapper->mapRecord($record, ['nodeData' => $nodeData]) as $propertyName => $propertyValue) {
             $nodeData->setProperty($propertyName, $propertyValue);
         }
         if ($record->hasAttribute('_timestamp')) {
@@ -459,7 +345,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
 
     private function nodeIdentifier(DataId $dataId): string
     {
-        return $this->idPrefix !== null ? $this->idPrefix . $dataId->toString() : $dataId->toString();
+        return $this->idPrefix !== null ? $this->idPrefix . $dataId->value : $dataId->value;
     }
 
     /**
@@ -481,7 +367,7 @@ final class ContentRepositoryTarget implements DataTargetInterface
         $newNodeData->setNodeType($nodeType);
 
         foreach ($nodeType->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
-            if (strncmp($propertyName, '_', 1) === 0) {
+            if (str_starts_with($propertyName, '_')) {
                 ObjectAccess::setProperty($newNodeData, substr($propertyName, 1), $propertyValue);
             } else {
                 $newNodeData->setProperty($propertyName, $propertyValue);
@@ -508,6 +394,9 @@ final class ContentRepositoryTarget implements DataTargetInterface
     public function setup(): Result
     {
         $result = new Result();
+        if ($this->parentNodeResolver !== null) {
+            return $result;
+        }
         if ($this->rootNodePath !== null) {
             try {
                 $rootNodeData = $this->getNodeDataByPath($this->rootNodePath);
@@ -515,22 +404,20 @@ final class ContentRepositoryTarget implements DataTargetInterface
             } catch (\RuntimeException $exception) {
                 if ($this->rootNodeTypeName === null) {
                     $result->addError(new Error('%s. No "rootNodeType" is configured', $exception->getCode(), [$exception->getMessage()]));
+                } else if (substr_count($this->rootNodePath, '/') !== 1) {
+                    $result->addError(new Error('Configured "rootNodePath" has to be on the root level ("/some-name") in order to be auto-generated. Given: "%s"', null, [$this->rootNodePath]));
                 } else {
-                    if (substr_count($this->rootNodePath, '/') !== 1) {
-                        $result->addError(new Error('Configured "rootNodePath" has to be on the root level ("/some-name") in order to be auto-generated. Given: "%s"', null, [$this->rootNodePath]));
-                    } else {
-                        $result->addWarning(new Warning('%s. Trying to create root node of type "%s"', $exception->getCode(), [$exception->getMessage(), $this->rootNodeTypeName]));
-                        $context = $this->contextFactory->create();
-                        $rootNodeTemplate = new NodeTemplate();
-                        $rootNodeTemplate->setNodeType($this->nodeTypeManager->getNodeType($this->rootNodeTypeName));
-                        $rootNodeTemplate->setName(ltrim($this->rootNodePath, '/'));
-                        $context->getRootNode()->createNodeFromTemplate($rootNodeTemplate);
-                        $result->addNotice(new Notice('Created root node of type "%s" at "%s"', null, [$this->rootNodeTypeName, $this->rootNodePath]));
-                    }
+                    $result->addWarning(new Warning('%s. Trying to create root node of type "%s"', $exception->getCode(), [$exception->getMessage(), $this->rootNodeTypeName]));
+                    $context = $this->contextFactory->create();
+                    $rootNodeTemplate = new NodeTemplate();
+                    $rootNodeTemplate->setNodeType($this->nodeTypeManager->getNodeType($this->rootNodeTypeName));
+                    $rootNodeTemplate->setName(ltrim($this->rootNodePath, '/'));
+                    $context->getRootNode()->createNodeFromTemplate($rootNodeTemplate);
+                    $result->addNotice(new Notice('Created root node of type "%s" at "%s"', null, [$this->rootNodeTypeName, $this->rootNodePath]));
                 }
             }
         } else {
-            $result->addWarning(new Warning('No "rootNodePath" configured'));
+            $result->addWarning(new Warning('No "rootNodePath" or "parentNodeResolver" configured'));
         }
         return $result;
     }

@@ -5,23 +5,18 @@ namespace Wwwision\ImportService\ValueObject;
 use Neos\Flow\Annotations as Flow;
 
 /**
- * @Flow\Proxy(false)
+ * @implements \IteratorAggregate<DataRecordInterface>
  */
+#[Flow\Proxy(false)]
 final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializable
 {
-    /**
-     * @var DataRecordInterface[]
-     */
-    private $records;
 
     /**
-     * @var int
+     * @param array<DataRecordInterface> $records
      */
-    private $count;
-
-    private function __construct(array $records)
-    {
-        $this->records = $records;
+    private function __construct(
+        private readonly array $records
+    ) {
     }
 
     public static function createEmpty(): self
@@ -54,9 +49,9 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
         $processedRecords = [];
         foreach ($records as $record) {
             if (!$record instanceof DataRecordInterface) {
-                throw new \RuntimeException(sprintf('Excepted array of %s instances, got: %s', DataRecord::class, \is_object($record) ? \get_class($record) : \gettype($record)), 1558352216);
+                throw new \RuntimeException(sprintf('Excepted array of %s instances, got: %s', DataRecord::class, \get_debug_type($record)), 1558352216);
             }
-            $processedRecords[$record->id()->toString()] = $record;
+            $processedRecords[$record->id()->value] = $record;
         }
         return new self($processedRecords);
     }
@@ -67,7 +62,7 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
             return $this;
         }
         $newRecords = $this->records;
-        $newRecords[(string)$record->id()] = $record;
+        $newRecords[$record->id()->value] = $record;
         return new self($newRecords);
     }
 
@@ -78,23 +73,20 @@ final class DataRecords implements \IteratorAggregate, \Countable, \JsonSerializ
 
     public function hasRecordWithId(DataId $dataId): bool
     {
-        return \array_key_exists($dataId->toString(), $this->records);
+        return \array_key_exists($dataId->value, $this->records);
     }
 
     /**
-     * @return DataRecordInterface[]|\Iterator
+     * @return \Traversable<DataRecordInterface>
      */
-    public function getIterator(): \Iterator
+    public function getIterator(): \Traversable
     {
         yield from $this->records;
     }
 
     public function count(): int
     {
-        if ($this->count === null) {
-            $this->count = \count($this->records);
-        }
-        return $this->count;
+        return \count($this->records);
     }
 
     public function isEmpty(): bool

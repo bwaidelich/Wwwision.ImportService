@@ -20,20 +20,11 @@ use Neos\Utility\TypeHandling;
  */
 final class OptionsSchema
 {
-    /**
-     * @var array
-     */
-    private $schema;
 
-    /**
-     * @var bool
-     */
-    private $allowAdditionalOptions;
-
-    protected function __construct(array $schema, bool $allowAdditionalOptions)
-    {
-        $this->schema = $schema;
-        $this->allowAdditionalOptions = $allowAdditionalOptions;
+    protected function __construct(
+        private readonly array $schema,
+        private readonly bool $allowAdditionalOptions
+    ) {
     }
 
     /**

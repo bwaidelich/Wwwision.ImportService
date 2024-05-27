@@ -4,52 +4,20 @@ namespace Wwwision\ImportService\ValueObject;
 
 use Neos\Flow\Annotations as Flow;
 
-/**
- * @Flow\Proxy(false)
- */
+#[Flow\Proxy(false)]
 final class ChangeSet
 {
 
-    /**
-     * @var DataRecords
-     */
-    private $addedRecords;
-
-    /**
-     * @var DataRecords
-     */
-    private $updatedRecords;
-
-    /**
-     * @var DataIds
-     */
-    private $removedIds;
-
-    private function __construct(DataRecords $addedRecords, DataRecords $updatedRecords, DataIds $removedIds)
-    {
-        $this->addedRecords = $addedRecords;
-        $this->updatedRecords = $updatedRecords;
-        $this->removedIds = $removedIds;
+    private function __construct(
+        public readonly DataRecords $addedRecords,
+        public readonly DataRecords $updatedRecords,
+        public readonly DataIds $removedIds
+    ) {
     }
 
     public static function fromAddedUpdatedAndRemoved(DataRecords $addedRecords, DataRecords $updatedRecords, DataIds $removedIds): self
     {
         return new self($addedRecords, $updatedRecords, $removedIds);
-    }
-
-    public function addedRecords(): DataRecords
-    {
-        return $this->addedRecords;
-    }
-
-    public function updatedRecords(): DataRecords
-    {
-        return $this->updatedRecords;
-    }
-
-    public function removedIds(): DataIds
-    {
-        return $this->removedIds;
     }
 
     public function hasDataToAdd(): bool

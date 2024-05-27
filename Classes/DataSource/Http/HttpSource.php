@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-namespace Wwwision\ImportService\DataSource;
+namespace Wwwision\ImportService\DataSource\Http;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -8,61 +8,28 @@ use GuzzleHttp\Psr7\Uri;
 use Neos\Error\Messages\Error;
 use Neos\Error\Messages\Notice;
 use Neos\Error\Messages\Result;
+use Neos\Flow\Annotations as Flow;
+use Wwwision\ImportService\DataSource\DataSourceInterface;
 use Wwwision\ImportService\ImportServiceException;
-use Wwwision\ImportService\OptionsSchema;
 use Wwwision\ImportService\ValueObject\DataRecords;
 
 /**
  * HTTP Data Source that allows to import records from some HTTP endpoint
  */
-final class HttpDataSource implements DataSourceInterface
+#[Flow\Proxy(false)]
+final class HttpSource implements DataSourceInterface
 {
 
-    /**
-     * @var Client
-     */
-    private $httpClient;
+    private readonly Client $httpClient;
 
-    /**
-     * @var Uri
-     */
-    private $endpoint;
-
-    /**
-     * @var string
-     */
-    private $idAttributeName;
-
-    /**
-     * @var string|null
-     */
-    private $versionAttributeName;
-
-    protected function __construct(array $options)
+    public function __construct(
+        private readonly Uri $endpoint,
+        private readonly string $idAttributeName,
+        private readonly string|null $versionAttributeName,
+        array $httpOptions,
+    )
     {
-        $this->endpoint = new Uri($options['endpoint']);
-        $this->idAttributeName = $options['idAttributeName'] ?? 'id';
-        $this->versionAttributeName = $options['versionAttributeName'] ?? null;
-        $defaultHttpOptions = [
-            'headers' => [
-                'Accept' => 'application/json'
-            ]
-        ];
-        $this->httpClient = new Client($options['httpOptions'] ?? $defaultHttpOptions);
-    }
-
-    public static function getOptionsSchema(): OptionsSchema
-    {
-        return OptionsSchema::create()
-            ->requires('endpoint', 'string')
-            ->has('idAttributeName', 'string')
-            ->has('versionAttributeName', 'string')
-            ->has('httpOptions', 'array');
-    }
-
-    public static function createWithOptions(array $options): DataSourceInterface
-    {
-        return new static($options);
+        $this->httpClient = new Client($httpOptions);
     }
 
     public function setup(): Result
@@ -94,7 +61,7 @@ final class HttpDataSource implements DataSourceInterface
         try {
             $data = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw new ImportServiceException(sprintf('Unexpected response body or malformed JSON on endpoint %s.', $this->endpoint), 1633522969);
+            throw new ImportServiceException(sprintf('Unexpected response body or malformed JSON on endpoint %s.', $this->endpoint), 1633522969, $e);
         }
 
         if (!\is_array($data)) {

@@ -1,0 +1,7 @@
+Wwwision\ImportService\Factory\ImportServiceFactory:
+  scope: singleton
+  arguments:
+    1:
+      setting: 'Wwwision.ImportService.presets'
+    2:
+      setting: 'Wwwision.ImportService.presetTemplates'

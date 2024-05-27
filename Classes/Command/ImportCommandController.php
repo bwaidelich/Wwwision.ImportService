@@ -4,24 +4,31 @@ namespace Wwwision\ImportService\Command;
 
 use Neos\Error\Messages\Message;
 use Neos\Error\Messages\Result;
+use Neos\Flow\Cli\CommandController;
 use Wwwision\ImportService\ImportService;
 use Wwwision\ImportService\ImportServiceException;
-use Wwwision\ImportService\ImportServiceFactory;
+use Wwwision\ImportService\Factory\ImportServiceFactory;
 use Wwwision\ImportService\ValueObject\ChangeSet;
 use Wwwision\ImportService\ValueObject\DataIds;
 use Wwwision\ImportService\ValueObject\DataRecords;
-use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Cli\CommandController;
-use Neos\Flow\Mvc\Exception\StopActionException;
 
 final class ImportCommandController extends CommandController
 {
 
+    public function __construct(
+        private readonly ImportServiceFactory $importServiceFactory,
+    ) {
+        parent::__construct();
+    }
+
     /**
-     * @Flow\Inject
-     * @var ImportServiceFactory
+     * @internal
+     * @deprecated use {@see self::runCommand} instead
      */
-    protected $importServiceFactory;
+    public function importCommand(string $preset, ?bool $quiet = null, ?bool $forceUpdates = null, ?bool $fromFixture = null): void
+    {
+        $this->runCommand($preset, $quiet, $forceUpdates, $fromFixture);
+    }
 
     /**
      * Synchronizes data (add, update, delete) for the given preset
@@ -30,9 +37,8 @@ final class ImportCommandController extends CommandController
      * @param bool|null $quiet If set, no output, apart from errors, will be displayed
      * @param bool|null $forceUpdates If set, all local records will be updated regardless of their version/timestamp. This is useful for node type changes that require new data to be fetched
      * @param bool|null $fromFixture If set, the data will be loaded from a local fixture file instead of the configured data source
-     * @throws StopActionException
      */
-    public function importCommand(string $preset, ?bool $quiet = null, ?bool $forceUpdates = null, ?bool $fromFixture = null): void
+    public function runCommand(string $preset, ?bool $quiet = null, ?bool $forceUpdates = null, ?bool $fromFixture = null): void
     {
         if ($fromFixture === true) {
             $importService = $this->importServiceFactory->createWithFixture($preset);
@@ -56,7 +62,6 @@ final class ImportCommandController extends CommandController
      * @param string $preset The preset to reset (see Wwwision.Import.presets setting)
      * @param bool|null $quiet If set, no output, apart from errors, will be displayed
      * @param bool|null $assumeYes If set, "yes" will be assumed for the confirmation question
-     * @throws StopActionException
      */
     public function pruneCommand(string $preset, ?bool $quiet = null, ?bool $assumeYes = null): void
     {
@@ -67,7 +72,6 @@ final class ImportCommandController extends CommandController
                 $this->outputLine('...cancelled');
             }
             $this->quit();
-            return;
         }
 
         try {
@@ -76,7 +80,6 @@ final class ImportCommandController extends CommandController
             $this->outputLine(\chr(10) . '<error>Error</error>');
             $this->outputLine('%s (%s)', [$exception->getMessage(), $exception->getCode()]);
             $this->quit(1);
-            return;
         }
 
         if ($quiet !== true) {
@@ -86,7 +89,6 @@ final class ImportCommandController extends CommandController
 
     /**
      * Lists all configured preset names
-     * @throws StopActionException
      */
     public function presetsCommand(): void
     {
@@ -94,7 +96,6 @@ final class ImportCommandController extends CommandController
         if ($presetNames === []) {
             $this->outputLine('<error>There are no import presets defined</error>');
             $this->quit();
-            return;
         }
         $presetCount = \count($presetNames);
         if ($presetCount === 1) {
@@ -109,14 +110,13 @@ final class ImportCommandController extends CommandController
 
     /**
      * Displays configuration for a given preset
-     * @throws StopActionException
      */
     public function presetCommand(string $preset): void
     {
         $presetConfiguration = $this->importServiceFactory->getPresetConfiguration($preset);
         $this->outputLine('<b>Source</b>');
         $rows = [
-            ['className', $presetConfiguration['source']['className']],
+            ['factory', $presetConfiguration['source']['factory']],
         ];
         foreach ($presetConfiguration['source']['options'] ?? [] as $optionKey => $optionValue) {
             $rows[] = [$optionKey, $optionValue];
@@ -125,7 +125,7 @@ final class ImportCommandController extends CommandController
 
         $this->outputLine('<b>Target</b>');
         $rows = [
-            ['className', $presetConfiguration['target']['className']],
+            ['factory', $presetConfiguration['target']['factory']],
         ];
         foreach ($presetConfiguration['target']['options'] ?? [] as $optionKey => $optionValue) {
             $rows[] = [$optionKey, $optionValue];
@@ -141,14 +141,18 @@ final class ImportCommandController extends CommandController
     }
 
     /**
-     * Setup the configured data source and target for the specified preset and/or display status
+     * Set up the configured data source and target for the specified preset and/or display status
      *
-     * @param string $preset Name of the preset to setup
+     * @param string $preset Name of the preset to set up
      */
     public function setupCommand(string $preset): void
     {
-        $presetInstance = $this->importServiceFactory->createPreset($preset);
-        $this->renderResult($presetInstance->setup());
+        $setupResult = $this->importServiceFactory->create($preset)->setUp();
+        $this->renderResult($setupResult);
+        if ($setupResult->hasErrors() || $setupResult->hasWarnings()) {
+            $this->quit(1);
+        }
+        $this->outputLine('<success>Setup finalized without errors or warnings</success>');
     }
 
     // ---------------------------------------
@@ -172,8 +176,11 @@ final class ImportCommandController extends CommandController
         if ($quiet) {
             return;
         }
+        $importService->on(ImportService::EVENT_PRE_COMPUTE_CHANGES, function(DataRecords $records) {
+            $this->outputLine('Loaded <b>%d</b> records, calculating diff …', [$records->count()]);
+        });
         $importService->on(ImportService::EVENT_PRE_IMPORT_DATA, function(ChangeSet $changeSet) {
-            $this->outputLine('<b>%s</b> to add, <b>%s</b> to update and <b>%s</b> to remove …', [$changeSet->addedRecords()->count(), $changeSet->updatedRecords()->count(), $changeSet->removedIds()->count()]);
+            $this->outputLine('<b>%s</b> to add, <b>%s</b> to update and <b>%s</b> to remove …', [$changeSet->addedRecords->count(), $changeSet->updatedRecords->count(), $changeSet->removedIds->count()]);
         });
 
         $importService->on(ImportService::EVENT_PRE_ADD_DATA, function(DataRecords $addedRecords) {

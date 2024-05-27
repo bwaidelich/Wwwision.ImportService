@@ -5,23 +5,19 @@ namespace Wwwision\ImportService\ValueObject;
 use Neos\Flow\Annotations as Flow;
 
 /**
- * @Flow\Proxy(false)
+ * @implements \IteratorAggregate<string>
  */
+#[Flow\Proxy(false)]
 final class DataIds implements \IteratorAggregate, \Countable
 {
-    /**
-     * @var string[]
-     */
-    private $ids;
 
     /**
-     * @var int
+     * @param array<string, DataId> $ids
      */
-    private $count;
-
-    private function __construct(array $ids)
+    private function __construct(
+        private readonly array $ids
+    )
     {
-        $this->ids = $ids;
     }
 
     public static function createEmpty(): self
@@ -29,52 +25,51 @@ final class DataIds implements \IteratorAggregate, \Countable
         return new self([]);
     }
 
-    public static function fromStringArray(array $ids)
+    public static function fromStringArray(array $ids): self
     {
         $convertedIds = [];
         foreach ($ids as $id) {
-            if (!\is_string($id)) {
+            if ($id instanceof DataId) {
+                $convertedIds[$id->value] = $id;
+            } else {
                 $id = (string)$id;
+                $convertedIds[$id] = DataId::fromString($id);
             }
-            $convertedIds[$id] = DataId::fromString($id);
         }
         return new self($convertedIds);
     }
 
     public function withId(DataId $id): self
     {
-        if (\array_key_exists($id->toString(), $this->ids)) {
+        if (\array_key_exists($id->value, $this->ids)) {
             return $this;
         }
         $newIds = $this->ids;
-        $newIds[$id->toString()] = $id;
+        $newIds[$id->value] = $id;
         return new self($newIds);
     }
 
     public function diff(DataIds $other): self
     {
-        return new self(array_diff($this->ids, $other->ids));
+        return self::fromStringArray(array_diff_key($this->ids, $other->ids));
     }
 
     public function has(DataId $dataId): bool
     {
-        return \array_key_exists($dataId->toString(), $this->ids);
+        return \array_key_exists($dataId->value, $this->ids);
     }
 
     /**
-     * @return string[]|\Iterator
+     * @return \Traversable<string>
      */
-    public function getIterator(): \Iterator
+    public function getIterator(): \Traversable
     {
         yield from $this->ids;
     }
 
     public function count(): int
     {
-        if ($this->count === null) {
-            $this->count = \count($this->ids);
-        }
-        return $this->count;
+        return \count($this->ids);
     }
 
     public function isEmpty(): bool
