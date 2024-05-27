@@ -23,9 +23,9 @@ final class ImportServiceFactory
     ) {
     }
 
-    public function create(string $presetName): ImportService
+    public function create(string $presetName, array|null $customSourceOptions, array|null $customTargetOptions): ImportService
     {
-        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName)));
+        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName), $customSourceOptions, $customTargetOptions));
     }
 
     public function createFromPreset(Preset $preset): ImportService
@@ -33,9 +33,9 @@ final class ImportServiceFactory
         return new ImportService($preset);
     }
 
-    public function createWithFixture(string $presetName): ImportService
+    public function createWithFixture(string $presetName, array|null $customTargetOptions): ImportService
     {
-        $preset = $this->presetFactory->create($this->getPresetConfiguration($presetName));
+        $preset = $this->presetFactory->create($this->getPresetConfiguration($presetName), null, $customTargetOptions);
         if (!isset($this->presets[$presetName]['source']['fixture']['file'])) {
             throw new \RuntimeException(sprintf('Missing "source.fixture.file" configuration for preset "%s"', $presetName), 1558433554);
         }
@@ -49,7 +49,7 @@ final class ImportServiceFactory
 
     public function createWithDataSource(string $presetName, DataSourceInterface $dataSource): ImportService
     {
-        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName))->withDataSource($dataSource));
+        return new ImportService($this->presetFactory->create($this->getPresetConfiguration($presetName), null, null)->withDataSource($dataSource));
     }
 
     public function getPresetConfiguration(string $presetName): array

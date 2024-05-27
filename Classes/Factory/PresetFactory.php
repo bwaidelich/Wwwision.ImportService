@@ -24,7 +24,7 @@ final class PresetFactory
     {
     }
 
-    public function create(array $configuration): Preset
+    public function create(array $configuration, array|null $customSourceOptions, array|null $customTargetOptions): Preset
     {
         if (!isset($configuration['source']['factory'])) {
             throw new \RuntimeException('Missing "source.factory" configuration', 1557238721);
@@ -39,15 +39,18 @@ final class PresetFactory
             throw new \RuntimeException(sprintf('The configured "source.factory" %s is not an instance of %s', $factoryClassName, DataSourceFactoryInterface::class), 1557238800);
         }
         $options = $configuration['source']['options'] ?? [];
+        if ($customSourceOptions !== null) {
+            $options = [...$options, ...$customSourceOptions];
+        }
         try {
             $dataSourceFactory->optionsSchema()->validate($options);
         } catch (\InvalidArgumentException $e) {
             throw new \RuntimeException(sprintf('Failed to create data source for factory of type %s: %s', $factoryClassName, $e->getMessage()), 1716822862, $e);
         }
-        return $this->createWithDataSource($configuration, $dataSourceFactory->create($options));
+        return $this->createWithDataSource($configuration, $dataSourceFactory->create($options), $customTargetOptions);
     }
 
-    public function createWithDataSource(array $configuration, DataSourceInterface $dataSource): Preset
+    public function createWithDataSource(array $configuration, DataSourceInterface $dataSource, array|null $customTargetOptions): Preset
     {
         if (!isset($configuration['mapping'])) {
             throw new \RuntimeException('Missing "mapping" configuration', 1558080904);
@@ -71,6 +74,9 @@ final class PresetFactory
             throw new \RuntimeException(sprintf('The configured "target.factory" %s is not an instance of %s', $factoryClassName, DataTargetFactoryInterface::class), 1557238877);
         }
         $options = $configuration['target']['options'] ?? [];
+        if ($customTargetOptions !== null) {
+            $options = [...$options, ...$customTargetOptions];
+        }
         try {
             $dataTargetFactory->optionsSchema()->validate($options);
         } catch (\InvalidArgumentException $e) {

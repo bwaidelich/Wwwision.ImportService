@@ -37,15 +37,21 @@ final class ImportCommandController extends CommandController
      * @param bool|null $quiet If set, no output, apart from errors, will be displayed
      * @param bool|null $forceUpdates If set, all local records will be updated regardless of their version/timestamp. This is useful for node type changes that require new data to be fetched
      * @param bool|null $fromFixture If set, the data will be loaded from a local fixture file instead of the configured data source
+     * @param string|null $overrideSourceOptions Allows to override default options for the data source via JSON, e.g. '{"endpoint":"https://some-custom.tld/endpoint"}'
+     * @param string|null $overrideTargetOptions Allows to override default options for the data target via JSON, e.g. '{"endpoint":"https://some-custom.tld/endpoint"}'
      */
-    public function runCommand(string $preset, ?bool $quiet = null, ?bool $forceUpdates = null, ?bool $fromFixture = null): void
+    public function runCommand(string $preset, ?bool $quiet = null, ?bool $forceUpdates = null, ?bool $fromFixture = null, ?string $overrideSourceOptions = null, ?string $overrideTargetOptions = null): void
     {
-        if ($fromFixture === true) {
-            $importService = $this->importServiceFactory->createWithFixture($preset);
+        $customSourceOptions = self::parseJsonOption($overrideSourceOptions);
+        $customTargetOptions = self::parseJsonOption($overrideTargetOptions);
+        if ($fromFixture) {
+            if ($customSourceOptions !== null) {
+                throw new \InvalidArgumentException('The options from-fixture and override-source-options must not be combined!', 1716824420);
+            }
+            $importService = $this->importServiceFactory->createWithFixture($preset, $customTargetOptions);
         } else {
-            $importService = $this->importServiceFactory->create($preset);
+            $importService = $this->importServiceFactory->create($preset, $customSourceOptions, $customTargetOptions);
         }
-
         $this->registerEventHandlers($importService, $quiet ?? false);
         try {
             $importService->importData($forceUpdates ?? false);
@@ -110,6 +116,8 @@ final class ImportCommandController extends CommandController
 
     /**
      * Displays configuration for a given preset
+     *
+     * @param string $preset The preset to show configuration for (see Wwwision.Import.presets setting)
      */
     public function presetCommand(string $preset): void
     {
@@ -162,6 +170,18 @@ final class ImportCommandController extends CommandController
         array_map(fn (Message $message) => $this->outputLine('<error>%s</error>', [$message->render()]), $result->getErrors());
         array_map(fn (Message $message) => $this->outputLine('<comment>%s</comment>', [$message->render()]), $result->getWarnings());
         array_map(fn (Message $message) => $this->outputLine('<success>%s</success>', [$message->render()]), $result->getNotices());
+    }
+
+    private static function parseJsonOption(string|null $option): ?array
+    {
+        if ($option === null) {
+            return null;
+        }
+        try {
+            return json_decode($option, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new \InvalidArgumentException(sprintf('Failed to JSON-decode option "%s": %s', $option, $e->getMessage()), 1716823861);
+        }
     }
 
     /**

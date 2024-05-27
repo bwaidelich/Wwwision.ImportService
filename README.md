@@ -126,9 +126,11 @@ Synchronizes data (add, update,delete) for the given preset.
 #### Options
 
 ```
-  --quiet              If set, no output, apart from errors, will be displayed
-  --force-updates      If set, all local records will be updated regardless of their version/timestamp. This is useful for node type changes that require new data to be fetched
-  --from-fixture       If set, the data will be loaded from a local fixture file instead of the configured data source
+  --quiet                   If set, no output, apart from errors, will be displayed
+  --force-updates           If set, all local records will be updated regardless of their version/timestamp. This is useful for node type changes that require new data to be fetched
+  --from-fixture            If set, the data will be loaded from a local fixture file instead of the configured data source
+  --override-source-options Allows to override default options for the data source via JSON, e.g. '{"endpoint":"https://some-custom.tld/endpoint"}'
+  --override-target-options Allows to override default options for the data target via JSON, e.g. '{"endpoint":"https://some-custom.tld/endpoint"}'
 ```
 
 ### `import:prune`
