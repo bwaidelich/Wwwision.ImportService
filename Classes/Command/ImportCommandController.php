@@ -71,7 +71,7 @@ final class ImportCommandController extends CommandController
      */
     public function pruneCommand(string $preset, ?bool $quiet = null, ?bool $assumeYes = null): void
     {
-        $importService = $this->importServiceFactory->create($preset);
+        $importService = $this->importServiceFactory->create($preset, null, null);
         $this->registerEventHandlers($importService, $quiet ?? false);
         if ($assumeYes !== true && !$this->output->askConfirmation(sprintf('<error>Are you sure you want to delete all local records for preset "%s" (y/n)?</error>', $preset), false)) {
             if ($quiet !== true) {
@@ -155,7 +155,7 @@ final class ImportCommandController extends CommandController
      */
     public function setupCommand(string $preset): void
     {
-        $setupResult = $this->importServiceFactory->create($preset)->setUp();
+        $setupResult = $this->importServiceFactory->create($preset, null, null)->setUp();
         $this->renderResult($setupResult);
         if ($setupResult->hasErrors() || $setupResult->hasWarnings()) {
             $this->quit(1);
